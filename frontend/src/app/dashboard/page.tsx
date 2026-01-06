@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSelector } from 'react-redux'
 import { RootState } from '@/store'
-import { Plane } from 'lucide-react'
+import Logo from '@/components/Logo'
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -26,10 +26,7 @@ export default function DashboardPage() {
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <Plane className="w-8 h-8 text-primary-600 rotate-45 mr-3" />
-              <h1 className="text-2xl font-bold text-primary-800">AEROLINK</h1>
-            </div>
+            <Logo size="md" />
             <div className="text-right">
               <p className="text-sm text-gray-600">Welcome back,</p>
               <p className="font-semibold text-primary-700">

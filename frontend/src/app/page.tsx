@@ -1,9 +1,14 @@
 import Link from 'next/link'
+import Logo from '@/components/Logo'
+import LogoIcon from '@/components/LogoIcon'
 
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24">
+    <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-50">
       <div className="text-center">
+        <div className="mb-6 flex justify-center">
+          <LogoIcon size={120} />
+        </div>
         <h1 className="text-5xl font-bold mb-4 text-primary-700">AEROLINK</h1>
         <p className="text-xl mb-8 text-gray-600">Flight Reservation Management System</p>
         <div className="space-x-4">
