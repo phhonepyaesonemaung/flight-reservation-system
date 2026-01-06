@@ -9,6 +9,7 @@ import { z } from 'zod'
 import { Eye, EyeOff, Plane, User, Mail, Phone } from 'lucide-react'
 import { api } from '@/lib/api'
 import toast from 'react-hot-toast'
+import LogoIcon from '@/components/LogoIcon'
 
 const signUpSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -84,8 +85,8 @@ export default function SignUpPage() {
         <div className="w-full max-w-2xl">
           {/* Logo and Header */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-primary-600 rounded-full mb-4 shadow-lg">
-              <Plane className="w-10 h-10 text-white rotate-45" />
+            <div className="inline-flex items-center justify-center mb-4">
+              <LogoIcon size={80} />
             </div>
             <h1 className="text-4xl font-bold text-primary-800 mb-2 tracking-tight">
               AEROLINK

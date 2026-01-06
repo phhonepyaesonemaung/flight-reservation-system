@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { Plane, Mail, ArrowLeft } from 'lucide-react'
 import { api } from '@/lib/api'
 import toast from 'react-hot-toast'
+import LogoIcon from '@/components/LogoIcon'
 
 const forgotPasswordSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -58,8 +59,8 @@ export default function ForgotPasswordPage() {
         <div className="w-full max-w-md">
           {/* Logo and Header */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-primary-600 rounded-full mb-4 shadow-lg">
-              <Plane className="w-10 h-10 text-white rotate-45" />
+            <div className="inline-flex items-center justify-center mb-4">
+              <LogoIcon size={80} />
             </div>
             <h1 className="text-4xl font-bold text-primary-800 mb-2 tracking-tight">
               AEROLINK
