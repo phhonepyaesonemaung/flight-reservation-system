@@ -34,7 +34,7 @@ export default function Logo({ size = 'md', showText = true, className = '', hre
       </div>
       
       {showText && (
-        <span className={`font-bold text-primary-800 tracking-tight ${textSizeClasses[size]}`}>
+        <span className={`font-bold tracking-tight ${textSizeClasses[size]}`}>
           AEROLINK
         </span>
       )}
