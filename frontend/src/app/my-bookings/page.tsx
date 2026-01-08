@@ -1,17 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSelector } from 'react-redux'
 import { RootState } from '@/store'
-import Link from 'next/link'
-import { Plane, Calendar, MapPin, User, Download, X } from 'lucide-react'
 import Logo from '@/components/Logo'
+import { Plane, Calendar, MapPin, Download, X, CheckCircle } from 'lucide-react'
+import Link from 'next/link'
 
 export default function MyBookingsPage() {
   const router = useRouter()
-  const { isAuthenticated } = useSelector((state: RootState) => state.auth)
-  const [filter, setFilter] = useState<'all' | 'upcoming' | 'completed' | 'cancelled'>('all')
+  const { isAuthenticated, user } = useSelector((state: RootState) => state.auth)
+  const [activeTab, setActiveTab] = useState<'upcoming' | 'past' | 'cancelled'>('upcoming')
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -20,73 +20,65 @@ export default function MyBookingsPage() {
   }, [isAuthenticated, router])
 
   // Mock bookings data
-  const bookings = [
-    {
-      id: 'BK001',
-      status: 'confirmed',
-      bookingDate: 'Jan 08, 2026',
-      flight: {
-        airline: 'AEROLINK Airways',
-        flightNumber: 'AL 101',
-        departure: {
-          time: '08:00 AM',
-          date: 'Jan 15, 2026',
-          code: 'MDL',
-          city: 'Mandalay',
+  const bookings = {
+    upcoming: [
+      {
+        id: '1',
+        confirmationNumber: 'AL2026-ABC123',
+        flight: {
+          airline: 'AEROLINK Airways',
+          flightNumber: 'AL 101',
+          origin: 'New York (JFK)',
+          destination: 'Los Angeles (LAX)',
+          departure: '08:00 AM',
+          arrival: '10:30 AM',
+          date: '2026-02-15',
         },
-        arrival: {
-          time: '10:30 AM',
-          date: 'Jan 15, 2026',
-          code: 'RGN',
-          city: 'Yangon',
-        },
+        seat: '12A',
+        status: 'Confirmed',
+        price: 285,
       },
-      passengers: 2,
-      seats: ['5A', '5B'],
-      totalAmount: 500,
-    },
-    {
-      id: 'BK002',
-      status: 'completed',
-      bookingDate: 'Dec 20, 2025',
-      flight: {
-        airline: 'Sky Jet',
-        flightNumber: 'SJ 205',
-        departure: {
-          time: '12:00 PM',
-          date: 'Dec 25, 2025',
-          code: 'RGN',
-          city: 'Yangon',
+      {
+        id: '2',
+        confirmationNumber: 'AL2026-XYZ789',
+        flight: {
+          airline: 'AEROLINK Airways',
+          flightNumber: 'AL 205',
+          origin: 'Los Angeles (LAX)',
+          destination: 'Miami (MIA)',
+          departure: '02:00 PM',
+          arrival: '10:00 PM',
+          date: '2026-03-10',
         },
-        arrival: {
-          time: '02:45 PM',
-          date: 'Dec 25, 2025',
-          code: 'MDL',
-          city: 'Mandalay',
-        },
+        seat: '8C',
+        status: 'Confirmed',
+        price: 320,
       },
-      passengers: 1,
-      seats: ['12C'],
-      totalAmount: 280,
-    },
-  ]
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'confirmed':
-        return 'bg-green-100 text-green-800'
-      case 'completed':
-        return 'bg-blue-100 text-blue-800'
-      case 'cancelled':
-        return 'bg-red-100 text-red-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
-    }
+    ],
+    past: [
+      {
+        id: '3',
+        confirmationNumber: 'AL2025-DEF456',
+        flight: {
+          airline: 'AEROLINK Airways',
+          flightNumber: 'AL 303',
+          origin: 'Miami (MIA)',
+          destination: 'New York (JFK)',
+          departure: '10:00 AM',
+          arrival: '01:00 PM',
+          date: '2025-12-20',
+        },
+        seat: '15F',
+        status: 'Completed',
+        price: 275,
+      },
+    ],
+    cancelled: [],
   }
 
-  if (!isAuthenticated) {
-    return null
-  }
+  const currentBookings = bookings[activeTab]
+
+  if (!isAuthenticated) return null
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -95,166 +87,130 @@ export default function MyBookingsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <Logo size="md" showText={true} className="text-white" />
-            <nav className="flex items-center space-x-6">
-              <Link href="/" className="text-white hover:text-blue-200 transition">Home</Link>
-              <Link href="/dashboard" className="text-white hover:text-blue-200 transition">Dashboard</Link>
-            </nav>
+            <Link href="/dashboard" className="text-white hover:text-blue-200 transition">
+              Dashboard
+            </Link>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">My Bookings</h1>
-          <p className="text-gray-600">View and manage your flight reservations</p>
-        </div>
+        <h1 className="text-3xl font-bold text-gray-800 mb-6">My Bookings</h1>
 
-        {/* Filter Tabs */}
-        <div className="bg-white rounded-lg shadow-md p-2 mb-6 flex space-x-2">
-          <button
-            onClick={() => setFilter('all')}
-            className={`flex-1 py-2 px-4 rounded-lg font-medium transition ${
-              filter === 'all' ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            All Bookings
-          </button>
-          <button
-            onClick={() => setFilter('upcoming')}
-            className={`flex-1 py-2 px-4 rounded-lg font-medium transition ${
-              filter === 'upcoming' ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            Upcoming
-          </button>
-          <button
-            onClick={() => setFilter('completed')}
-            className={`flex-1 py-2 px-4 rounded-lg font-medium transition ${
-              filter === 'completed' ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            Completed
-          </button>
-          <button
-            onClick={() => setFilter('cancelled')}
-            className={`flex-1 py-2 px-4 rounded-lg font-medium transition ${
-              filter === 'cancelled' ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            Cancelled
-          </button>
+        {/* Tabs */}
+        <div className="bg-white rounded-lg shadow-md mb-6">
+          <div className="flex border-b border-gray-200">
+            <button
+              onClick={() => setActiveTab('upcoming')}
+              className={`flex-1 py-4 px-6 text-center font-semibold transition ${
+                activeTab === 'upcoming'
+                  ? 'text-primary-600 border-b-2 border-primary-600'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              Upcoming ({bookings.upcoming.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('past')}
+              className={`flex-1 py-4 px-6 text-center font-semibold transition ${
+                activeTab === 'past'
+                  ? 'text-primary-600 border-b-2 border-primary-600'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              Past ({bookings.past.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('cancelled')}
+              className={`flex-1 py-4 px-6 text-center font-semibold transition ${
+                activeTab === 'cancelled'
+                  ? 'text-primary-600 border-b-2 border-primary-600'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              Cancelled ({bookings.cancelled.length})
+            </button>
+          </div>
         </div>
 
         {/* Bookings List */}
-        <div className="space-y-6">
-          {bookings.map((booking) => (
-            <div key={booking.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition">
-              <div className="p-6">
-                {/* Booking Header */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center space-x-3">
-                    <Plane className="w-6 h-6 text-primary-600" />
-                    <div>
-                      <h3 className="text-lg font-bold text-gray-800">{booking.flight.airline}</h3>
-                      <p className="text-sm text-gray-600">Booking ID: {booking.id}</p>
-                    </div>
-                  </div>
-                  <span className={`px-4 py-1 rounded-full text-sm font-semibold ${getStatusColor(booking.status)}`}>
-                    {booking.status.toUpperCase()}
-                  </span>
-                </div>
-
-                {/* Flight Route */}
-                <div className="grid grid-cols-3 gap-4 mb-4">
-                  <div>
-                    <p className="text-sm text-gray-500 mb-1">Departure</p>
-                    <p className="text-xl font-bold text-gray-800">{booking.flight.departure.time}</p>
-                    <p className="text-sm text-gray-600">{booking.flight.departure.date}</p>
-                    <div className="flex items-center space-x-1 mt-2">
-                      <MapPin className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm font-semibold text-gray-700">
-                        {booking.flight.departure.code} - {booking.flight.departure.city}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-center justify-center">
-                    <div className="w-full h-px bg-gray-300 relative">
-                      <Plane className="w-5 h-5 text-primary-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white" />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">{booking.flight.flightNumber}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-gray-500 mb-1">Arrival</p>
-                    <p className="text-xl font-bold text-gray-800">{booking.flight.arrival.time}</p>
-                    <p className="text-sm text-gray-600">{booking.flight.arrival.date}</p>
-                    <div className="flex items-center justify-end space-x-1 mt-2">
-                      <span className="text-sm font-semibold text-gray-700">
-                        {booking.flight.arrival.code} - {booking.flight.arrival.city}
-                      </span>
-                      <MapPin className="w-4 h-4 text-gray-400" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Booking Details */}
-                <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                  <div className="flex items-center space-x-6 text-sm text-gray-600">
-                    <div className="flex items-center space-x-2">
-                      <User className="w-4 h-4" />
-                      <span>{booking.passengers} Passenger(s)</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Calendar className="w-4 h-4" />
-                      <span>Booked on {booking.bookingDate}</span>
-                    </div>
-                    <div>
-                      <span className="font-semibold">Seats: </span>
-                      {booking.seats.join(', ')}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-gray-600">Total Paid</p>
-                    <p className="text-2xl font-bold text-primary-600">${booking.totalAmount}</p>
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex items-center space-x-3 mt-4 pt-4 border-t border-gray-200">
-                  <Link
-                    href={`/bookings/confirmation/${booking.id}`}
-                    className="flex-1 bg-primary-600 hover:bg-primary-700 text-white py-2 px-4 rounded-lg font-semibold transition text-center"
-                  >
-                    View Details
-                  </Link>
-                  <button className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 py-2 px-4 rounded-lg font-semibold transition flex items-center space-x-2">
-                    <Download className="w-4 h-4" />
-                    <span>Download</span>
-                  </button>
-                  {booking.status === 'confirmed' && (
-                    <button className="bg-white border border-red-300 hover:bg-red-50 text-red-600 py-2 px-4 rounded-lg font-semibold transition flex items-center space-x-2">
-                      <X className="w-4 h-4" />
-                      <span>Cancel</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Empty State */}
-        {bookings.length === 0 && (
+        {currentBookings.length === 0 ? (
           <div className="bg-white rounded-lg shadow-md p-12 text-center">
-            <Plane className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-gray-800 mb-2">No bookings found</h3>
-            <p className="text-gray-600 mb-6">You haven't made any flight reservations yet</p>
+            <Plane className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">No bookings found</h3>
+            <p className="text-gray-600 mb-6">You don't have any {activeTab} bookings yet.</p>
             <Link
               href="/"
-              className="inline-block bg-primary-600 hover:bg-primary-700 text-white py-3 px-8 rounded-lg font-semibold transition"
+              className="inline-block bg-accent hover:bg-accent-hover text-white px-8 py-3 rounded-lg font-semibold transition"
             >
-              Book a Flight Now
+              Book a Flight
             </Link>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {currentBookings.map((booking) => (
+              <div key={booking.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition">
+                <div className="p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <div className="flex items-center mb-2">
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          booking.status === 'Confirmed'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {booking.status}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-500">Confirmation: {booking.confirmationNumber}</p>
+                    </div>
+                    <p className="text-2xl font-bold text-gray-800">${booking.price}</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div>
+                      <p className="text-sm text-gray-500 mb-1">Flight</p>
+                      <p className="font-semibold text-gray-800">{booking.flight.airline}</p>
+                      <p className="text-gray-600">{booking.flight.flightNumber}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500 mb-1">Route</p>
+                      <p className="font-semibold text-gray-800">{booking.flight.origin}</p>
+                      <p className="text-gray-600 flex items-center">
+                        <span className="text-accent mx-2">→</span>
+                        {booking.flight.destination}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500 mb-1">Date & Time</p>
+                      <p className="font-semibold text-gray-800">{booking.flight.date}</p>
+                      <p className="text-gray-600">{booking.flight.departure} - {booking.flight.arrival}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                    <div className="text-sm text-gray-600">
+                      Seat: <span className="font-semibold text-gray-800">{booking.seat}</span>
+                    </div>
+                    <div className="flex space-x-3">
+                      <button className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center">
+                        <Download className="w-4 h-4 mr-2" />
+                        Download Ticket
+                      </button>
+                      {activeTab === 'upcoming' && (
+                        <Link
+                          href="/check-in"
+                          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
+                        >
+                          Check-in
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </main>
