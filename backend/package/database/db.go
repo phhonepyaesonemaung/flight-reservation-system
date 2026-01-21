@@ -26,8 +26,14 @@ func InitDB(host, port, user, password, dbname string) error {
 
 	log.Println("Successfully connected to PostgreSQL database")
 
+	// Create users table if it doesn't exist
 	if err := createUsersTable(); err != nil {
 		return fmt.Errorf("failed to create users table: %w", err)
+	}
+
+	// Create flight tables if it doesn't exist
+	if err := createFlightTables(); err != nil {
+		return fmt.Errorf("failed to create flight tables: %w", err)
 	}
 
 	return nil
@@ -57,6 +63,88 @@ func createUsersTable() error {
 	}
 
 	log.Println("Users table initialized successfully")
+	return nil
+}
+
+func createFlightTables() error {
+	query := `
+	-- Airports table
+	CREATE TABLE IF NOT EXISTS airports (
+		id SERIAL PRIMARY KEY,
+		code VARCHAR(10) UNIQUE NOT NULL,
+		name VARCHAR(150) NOT NULL,
+		city VARCHAR(100) NOT NULL,
+		country VARCHAR(100) NOT NULL,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
+
+	-- Aircraft table
+	CREATE TABLE IF NOT EXISTS aircraft (
+		id SERIAL PRIMARY KEY,
+		model VARCHAR(100) NOT NULL,
+		total_seats INT NOT NULL,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
+
+	-- Flights table
+	CREATE TABLE IF NOT EXISTS flights (
+		id SERIAL PRIMARY KEY,
+		flight_number VARCHAR(20) NOT NULL,
+
+		departure_airport_id INT NOT NULL
+			REFERENCES airports(id) ON DELETE CASCADE,
+
+		arrival_airport_id INT NOT NULL
+			REFERENCES airports(id) ON DELETE CASCADE,
+
+		departure_time TIMESTAMP NOT NULL,
+		arrival_time TIMESTAMP NOT NULL,
+
+		aircraft_id INT NOT NULL
+			REFERENCES aircraft(id) ON DELETE RESTRICT,
+
+		base_price DECIMAL(10,2) NOT NULL,
+
+		status VARCHAR(20)
+			CHECK (status IN ('scheduled', 'delayed', 'cancelled'))
+			DEFAULT 'scheduled',
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
+
+	-- Seat table
+	CREATE TABLE IF NOT EXISTS seats (
+		id SERIAL PRIMARY KEY,
+
+		aircraft_id INT NOT NULL
+			REFERENCES aircraft(id) ON DELETE RESTRICT,
+
+		seat_number VARCHAR(5) NOT NULL,
+
+		class VARCHAR(20)
+			CHECK (class IN ('economy', 'business'))
+			DEFAULT 'economy',
+
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+		UNIQUE (aircraft_id, seat_number)
+	);
+
+	-- Indexes
+	CREATE INDEX IF NOT EXISTS idx_aircraft_model ON aircraft(model);
+	CREATE INDEX IF NOT EXISTS idx_flights_aircraft_id ON flights(aircraft_id);
+	CREATE INDEX IF NOT EXISTS idx_seats_aircraft_id ON seats(aircraft_id);
+	`
+
+	_, err := DB.Exec(query)
+	if err != nil {
+		return err
+	}
+
+	log.Println("Flight tables initialized successfully")
 	return nil
 }
 

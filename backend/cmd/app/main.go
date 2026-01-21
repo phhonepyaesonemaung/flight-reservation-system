@@ -2,6 +2,7 @@ package main
 
 import (
 	"aerolink_backend/internal/auth"
+	"aerolink_backend/internal/flight/airports"
 	"aerolink_backend/internal/user"
 	"aerolink_backend/package/database"
 	"aerolink_backend/package/jwt"
@@ -29,6 +30,7 @@ func main() {
 	// Auth routes
 	authHandler := auth.NewHandler(database.DB)
 	userHandler := user.NewHandler(database.DB)
+	airportHandler := airports.NewHandler(database.DB)
 
 	http.HandleFunc("/api/auth/signup", authHandler.Signup)
 	http.HandleFunc("/api/auth/signin", authHandler.Signin)
@@ -36,6 +38,9 @@ func main() {
 
 	// User routes (protected)
 	http.HandleFunc("/api/user/get", middleware.AuthMiddleware(userHandler.GetUser))
+
+	// Flight routes (protected)
+	http.HandleFunc("/api/flight/create-airport", airportHandler.CreateAirport)
 
 	// Health check endpoint
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
