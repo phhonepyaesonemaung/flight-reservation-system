@@ -15,16 +15,16 @@ COPY . .
 # Build the application from cmd/app
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/app
 
-# Final stage
-FROM alpine:latest
+# # Final stage
+# FROM alpine:latest
 
-WORKDIR /root/
+# WORKDIR /root/
 
-# Install ca-certificates for HTTPS requests
-RUN apk --no-cache add ca-certificates
+# # Install ca-certificates for HTTPS requests
+# RUN apk update && apk add --no-cache ca-certificates
 
-# Copy the binary from builder
-COPY --from=builder /app/main .
+# # Copy the binary from builder
+# COPY --from=builder /app/main .
 
 # Expose port
 EXPOSE 8080

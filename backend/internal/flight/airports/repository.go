@@ -41,3 +41,29 @@ func (r *Repository) CodeExists(code string) (bool, error) {
 	}
 	return true, nil
 }
+
+func (r *Repository) GetAllAirports() ([]Airport, error) {
+	rows, err := r.db.Query(`
+		SELECT id, code, name, city, country, created_at, updated_at
+		FROM airports
+		ORDER BY id ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	airports := make([]Airport, 0)
+	for rows.Next() {
+		var a Airport
+		if err := rows.Scan(&a.ID, &a.Code, &a.Name, &a.City, &a.Country, &a.CreatedAt, &a.UpdatedAt); err != nil {
+			return nil, err
+		}
+		airports = append(airports, a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return airports, nil
+}

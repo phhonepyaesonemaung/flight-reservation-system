@@ -35,3 +35,11 @@ func (s *Service) CreateAirport(req *CreateAirportRequest) (*Airport, error) {
 
 	return airport, nil
 }
+
+func (s *Service) GetAllAirports() ([]Airport, error) {
+	airports, err := s.repo.GetAllAirports()
+	if err != nil {
+		return nil, errors.New("failed to fetch airports")
+	}
+	return airports, nil
+}
