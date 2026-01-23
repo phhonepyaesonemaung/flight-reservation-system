@@ -124,7 +124,7 @@ func createFlightTables() error {
 		seat_number VARCHAR(5) NOT NULL,
 
 		class VARCHAR(20)
-			CHECK (class IN ('economy', 'business'))
+			CHECK (class IN ('economy', 'business', 'first'))
 			DEFAULT 'economy',
 
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

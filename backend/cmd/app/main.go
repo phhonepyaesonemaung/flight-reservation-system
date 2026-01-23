@@ -5,6 +5,7 @@ import (
 	"aerolink_backend/internal/flight/aircrafts"
 	"aerolink_backend/internal/flight/airports"
 	"aerolink_backend/internal/flight/flights"
+	"aerolink_backend/internal/flight/seats"
 	"aerolink_backend/internal/user"
 	"aerolink_backend/package/database"
 	"aerolink_backend/package/jwt"
@@ -35,6 +36,7 @@ func main() {
 	airportHandler := airports.NewHandler(database.DB)
 	aircraftHandler := aircrafts.NewHandler(database.DB)
 	flightHandler := flights.NewHandler(database.DB)
+	seatHandler := seats.NewHandler(database.DB)
 
 	http.HandleFunc("/api/auth/signup", authHandler.Signup)
 	http.HandleFunc("/api/auth/signin", authHandler.Signin)
@@ -50,6 +52,8 @@ func main() {
 	http.HandleFunc("/api/flight/get-all-aircrafts", aircraftHandler.GetAllAircrafts)
 	http.HandleFunc("/api/flight/create-flight", flightHandler.CreateFlight)
 	http.HandleFunc("/api/flight/get-all-flights", flightHandler.GetAllFlights)
+	http.HandleFunc("/api/flight/create-seat", seatHandler.CreateSeat)
+	http.HandleFunc("/api/flight/get-all-seats", seatHandler.GetAllSeats)
 
 	// Health check endpoint
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
