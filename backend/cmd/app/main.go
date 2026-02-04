@@ -23,7 +23,7 @@ func main() {
 	dbPort := getEnv("DB_PORT", "5432")
 	dbUser := getEnv("DB_USER", "postgres")
 	dbPassword := getEnv("DB_PASSWORD", "postgres")
-	dbName := getEnv("DB_NAME", "op_db")
+	dbName := getEnv("DB_NAME", "aerolink_db")
 
 	if err := database.InitDB(dbHost, dbPort, dbUser, dbPassword, dbName); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)

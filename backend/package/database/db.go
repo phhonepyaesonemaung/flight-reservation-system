@@ -133,10 +133,56 @@ func createFlightTables() error {
 		UNIQUE (aircraft_id, seat_number)
 	);
 
+	-- Flight Seats table
+	CREATE TABLE IF NOT EXISTS flight_seats (
+		id SERIAL PRIMARY KEY,
+
+		flight_id INT NOT NULL
+			REFERENCES flights(id) ON DELETE CASCADE,
+
+		seat_id INT NOT NULL
+			REFERENCES seats(id) ON DELETE RESTRICT,
+
+		is_occupied BOOLEAN NOT NULL DEFAULT false,
+
+		booking_id INT NULL,
+
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+		UNIQUE (flight_id, seat_id)
+	);
+
+	-- Flight Cabin Inventory table
+	CREATE TABLE IF NOT EXISTS flight_cabin_inventory (
+		id SERIAL PRIMARY KEY,
+
+		flight_id INT NOT NULL
+			REFERENCES flights(id) ON DELETE CASCADE,
+
+		cabin_class VARCHAR(20) NOT NULL
+			CHECK (cabin_class IN ('economy', 'business', 'first')),
+
+		total_seats INT NOT NULL,
+
+		available_seats INT NOT NULL,
+
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+		UNIQUE (flight_id, cabin_class)
+	);
+
 	-- Indexes
 	CREATE INDEX IF NOT EXISTS idx_aircraft_model ON aircraft(model);
 	CREATE INDEX IF NOT EXISTS idx_flights_aircraft_id ON flights(aircraft_id);
 	CREATE INDEX IF NOT EXISTS idx_seats_aircraft_id ON seats(aircraft_id);
+	CREATE INDEX IF NOT EXISTS idx_flight_seats_flight ON flight_seats(flight_id);
+	CREATE INDEX IF NOT EXISTS idx_flight_seats_available ON flight_seats(flight_id, is_occupied);
+	CREATE INDEX IF NOT EXISTS idx_fci_flight ON flight_cabin_inventory(flight_id);
+	CREATE INDEX IF NOT EXISTS idx_fci_search ON flight_cabin_inventory(flight_id, cabin_class, available_seats);
+	CREATE INDEX IF NOT EXISTS idx_flights_search ON flights (departure_airport_id, arrival_airport_id, departure_time);
+	CREATE INDEX IF NOT EXISTS idx_seats_class ON seats (class);
 	`
 
 	_, err := DB.Exec(query)
