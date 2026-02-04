@@ -14,19 +14,51 @@ func NewRepository(db *sql.DB) *Repository {
 }
 
 func (r *Repository) CreateFlight(flightNumber string, departureAirportID, arrivalAirportID, aircraftID int, departureTime, arrivalTime time.Time, basePrice float64, status string) (*Flight, error) {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
 	var flight Flight
 	now := time.Now()
-	err := r.db.QueryRow(
+	err = tx.QueryRow(
 		`INSERT INTO flights (flight_number, departure_airport_id, arrival_airport_id, departure_time, arrival_time, aircraft_id, base_price, status, created_at, updated_at)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		 RETURNING id, flight_number, departure_airport_id, arrival_airport_id, departure_time, arrival_time, aircraft_id, base_price, status, created_at, updated_at`,
 		flightNumber, departureAirportID, arrivalAirportID, departureTime, arrivalTime, aircraftID, basePrice, status, now, now,
 	).Scan(&flight.ID, &flight.FlightNumber, &flight.DepartureAirportID, &flight.ArrivalAirportID, &flight.DepartureTime, &flight.ArrivalTime, &flight.AircraftID, &flight.BasePrice, &flight.Status, &flight.CreatedAt, &flight.UpdatedAt)
-
 	if err != nil {
 		return nil, err
 	}
 
+	seatRows, err := tx.Query(`SELECT id FROM seats WHERE aircraft_id = $1`, aircraftID)
+	if err != nil {
+		return nil, err
+	}
+	defer seatRows.Close()
+	for seatRows.Next() {
+		var seatID int
+		if err := seatRows.Scan(&seatID); err != nil {
+			return nil, err
+		}
+		_, err := tx.Exec(
+			`INSERT INTO flight_seats (flight_id, seat_id, is_occupied) VALUES ($1, $2, false)`,
+			flight.ID, seatID,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err := seatRows.Err(); err != nil {
+		return nil, err
+	}
+
+	// flight_cabin_inventory is a VIEW derived from flight_seats; no insert needed
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
 	return &flight, nil
 }
 

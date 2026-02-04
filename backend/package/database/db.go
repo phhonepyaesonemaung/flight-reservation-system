@@ -36,6 +36,11 @@ func InitDB(host, port, user, password, dbname string) error {
 		return fmt.Errorf("failed to create flight tables: %w", err)
 	}
 
+	// Create booking tables if it doesn't exist
+	if err := createBookingTables(); err != nil {
+		return fmt.Errorf("failed to create booking tables: %w", err)
+	}
+
 	return nil
 }
 
@@ -175,7 +180,12 @@ func createFlightTables() error {
 
 	-- Indexes
 	CREATE INDEX IF NOT EXISTS idx_aircraft_model ON aircraft(model);
+
+	CREATE INDEX IF NOT EXISTS idx_flights_search
+	ON flights (departure_airport_id, arrival_airport_id, departure_time);
+
 	CREATE INDEX IF NOT EXISTS idx_flights_aircraft_id ON flights(aircraft_id);
+
 	CREATE INDEX IF NOT EXISTS idx_seats_aircraft_id ON seats(aircraft_id);
 	CREATE INDEX IF NOT EXISTS idx_flight_seats_flight ON flight_seats(flight_id);
 	CREATE INDEX IF NOT EXISTS idx_flight_seats_available ON flight_seats(flight_id, is_occupied);
@@ -190,7 +200,72 @@ func createFlightTables() error {
 		return err
 	}
 
+	// flight_cabin_inventory: VIEW derived from flight_seats + seats (single source of truth)
+	_, _ = DB.Exec(`DROP TABLE IF EXISTS flight_cabin_inventory CASCADE`)
+	_, _ = DB.Exec(`DROP VIEW IF EXISTS flight_cabin_inventory`)
+	viewQuery := `
+	CREATE VIEW flight_cabin_inventory AS
+	SELECT
+		fs.flight_id,
+		s.class AS cabin_class,
+		COUNT(*)::int AS total_seats,
+		COUNT(*) FILTER (WHERE NOT fs.is_occupied)::int AS available_seats
+	FROM flight_seats fs
+	JOIN seats s ON s.id = fs.seat_id
+	GROUP BY fs.flight_id, s.class;
+	`
+	_, err = DB.Exec(viewQuery)
+	if err != nil {
+		return err
+	}
+
 	log.Println("Flight tables initialized successfully")
+	return nil
+}
+
+func createBookingTables() error {
+	query := `
+	-- Bookings table
+	CREATE TABLE IF NOT EXISTS bookings (
+    id SERIAL PRIMARY KEY,
+
+    user_id INT NOT NULL
+        REFERENCES users(id) ON DELETE CASCADE,
+
+    booking_reference VARCHAR(10) UNIQUE NOT NULL, -- PNR
+
+    status VARCHAR(20) NOT NULL
+        CHECK (status IN ('pending', 'confirmed', 'cancelled')),
+
+    total_amount NUMERIC(10,2) NOT NULL,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+	-- Booking Flights table
+	CREATE TABLE IF NOT EXISTS booking_flights (
+    booking_id INT NOT NULL
+        REFERENCES bookings(id) ON DELETE CASCADE,
+
+    flight_id INT NOT NULL
+        REFERENCES flights(id) ON DELETE RESTRICT,
+
+    cabin_class VARCHAR(20) NOT NULL
+        CHECK (cabin_class IN ('economy', 'business', 'first')),
+
+    price NUMERIC(10,2) NOT NULL,
+
+    PRIMARY KEY (booking_id, flight_id)
+	);
+	`
+
+	_, err := DB.Exec(query)
+	if err != nil {
+		return err
+	}
+
+	log.Println("Booking tables initialized successfully")
 	return nil
 }
 
