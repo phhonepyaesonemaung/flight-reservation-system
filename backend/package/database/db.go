@@ -191,30 +191,13 @@ func createFlightTables() error {
 	CREATE INDEX IF NOT EXISTS idx_flight_seats_available ON flight_seats(flight_id, is_occupied);
 	CREATE INDEX IF NOT EXISTS idx_fci_flight ON flight_cabin_inventory(flight_id);
 	CREATE INDEX IF NOT EXISTS idx_fci_search ON flight_cabin_inventory(flight_id, cabin_class, available_seats);
-	CREATE INDEX IF NOT EXISTS idx_flights_search ON flights (departure_airport_id, arrival_airport_id, departure_time);
 	CREATE INDEX IF NOT EXISTS idx_seats_class ON seats (class);
 	`
 
-	_, err := DB.Exec(query)
-	if err != nil {
-		return err
-	}
-
-	// flight_cabin_inventory: VIEW derived from flight_seats + seats (single source of truth)
-	_, _ = DB.Exec(`DROP TABLE IF EXISTS flight_cabin_inventory CASCADE`)
+	// If flight_cabin_inventory was created as a view previously, drop it so we can use the table
 	_, _ = DB.Exec(`DROP VIEW IF EXISTS flight_cabin_inventory`)
-	viewQuery := `
-	CREATE VIEW flight_cabin_inventory AS
-	SELECT
-		fs.flight_id,
-		s.class AS cabin_class,
-		COUNT(*)::int AS total_seats,
-		COUNT(*) FILTER (WHERE NOT fs.is_occupied)::int AS available_seats
-	FROM flight_seats fs
-	JOIN seats s ON s.id = fs.seat_id
-	GROUP BY fs.flight_id, s.class;
-	`
-	_, err = DB.Exec(viewQuery)
+
+	_, err := DB.Exec(query)
 	if err != nil {
 		return err
 	}

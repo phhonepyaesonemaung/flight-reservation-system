@@ -31,34 +31,6 @@ func (r *Repository) CreateSeat(aircraftId int, seatNumber, class string) (*Seat
 	if err != nil {
 		return nil, err
 	}
-
-	rows, err := tx.Query(`SELECT id FROM flights WHERE aircraft_id = $1`, aircraftId)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var flightID int
-		if err := rows.Scan(&flightID); err != nil {
-			return nil, err
-		}
-		_, err := tx.Exec(
-			`INSERT INTO flight_seats (flight_id, seat_id, is_occupied) VALUES ($1, $2, false)`,
-			flightID, seat.ID,
-		)
-		if err != nil {
-			return nil, err
-		}
-		// flight_cabin_inventory is a VIEW derived from flight_seats; no update needed
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
 	return &seat, nil
 }
 
@@ -91,4 +63,60 @@ func (r *Repository) GetAllSeats(aircraftID *int) ([]Seat, error) {
 	}
 
 	return seats, nil
+}
+
+// GetFlightAircraftID returns the aircraft_id for the given flight.
+func (r *Repository) GetFlightAircraftID(flightID int) (int, error) {
+	var aircraftID int
+	err := r.db.QueryRow(
+		`SELECT aircraft_id FROM flights WHERE id = $1`,
+		flightID,
+	).Scan(&aircraftID)
+	return aircraftID, err
+}
+
+// FlightInfo holds flight id and its aircraft id for bulk processing.
+type FlightInfo struct {
+	FlightID   int
+	AircraftID int
+}
+
+// GetAllFlights returns all flights with their aircraft_id.
+func (r *Repository) GetAllFlights() ([]FlightInfo, error) {
+	rows, err := r.db.Query(`SELECT id, aircraft_id FROM flights ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []FlightInfo
+	for rows.Next() {
+		var f FlightInfo
+		if err := rows.Scan(&f.FlightID, &f.AircraftID); err != nil {
+			return nil, err
+		}
+		list = append(list, f)
+	}
+	return list, rows.Err()
+}
+
+// CreateFlightSeats inserts flight_seats rows for the given flight and seat IDs. Ignores duplicates (ON CONFLICT DO NOTHING).
+// Returns the number of rows actually inserted.
+func (r *Repository) CreateFlightSeats(flightID int, seatIDs []int) (created int64, err error) {
+	if len(seatIDs) == 0 {
+		return 0, nil
+	}
+	var total int64
+	for _, seatID := range seatIDs {
+		res, err := r.db.Exec(
+			`INSERT INTO flight_seats (flight_id, seat_id, is_occupied) VALUES ($1, $2, false)
+			 ON CONFLICT (flight_id, seat_id) DO NOTHING`,
+			flightID, seatID,
+		)
+		if err != nil {
+			return 0, err
+		}
+		n, _ := res.RowsAffected()
+		total += n
+	}
+	return total, nil
 }

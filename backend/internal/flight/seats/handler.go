@@ -78,3 +78,19 @@ func (h *Handler) GetAllSeats(w http.ResponseWriter, r *http.Request) {
 
 	response.Success(w, http.StatusOK, "success", seats)
 }
+
+func (h *Handler) CreateFlightSeats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		response.Error(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	result, err := h.service.CreateFlightSeatsForAll()
+	if err != nil {
+		log.Printf("Create flight seats error: %v", err)
+		response.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response.Success(w, http.StatusCreated, "success", result)
+}

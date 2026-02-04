@@ -78,3 +78,50 @@ func (h *Handler) GetAllFlights(w http.ResponseWriter, r *http.Request) {
 
 	response.Success(w, http.StatusOK, "success", flights)
 }
+
+func (h *Handler) BackfillFlightCabinInventory(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		response.Error(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	flightsProcessed, err := h.service.BackfillFlightCabinInventory()
+	if err != nil {
+		log.Printf("Backfill flight cabin inventory error: %v", err)
+		response.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response.Success(w, http.StatusOK, "success", map[string]int{"flights_processed": flightsProcessed})
+}
+
+func (h *Handler) SearchFlights(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		response.Error(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	var req SearchFlightsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.Type != "one-way" && req.Type != "round-trip" {
+		response.Error(w, http.StatusBadRequest, "type must be one-way or round-trip")
+		return
+	}
+
+	resp, err := h.service.SearchFlights(&req)
+	if err != nil {
+		statusCode := http.StatusInternalServerError
+		if strings.Contains(err.Error(), "required") || strings.Contains(err.Error(), "must be") {
+			statusCode = http.StatusBadRequest
+		}
+		log.Printf("Search flights error: %v", err)
+		response.Error(w, statusCode, err.Error())
+		return
+	}
+
+	response.Success(w, http.StatusOK, "success", resp)
+}

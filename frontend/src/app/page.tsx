@@ -1,25 +1,32 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Bell, Search, Calendar, User, Users } from 'lucide-react'
+import { Bell, Search, Calendar, Users } from 'lucide-react'
 import Link from 'next/link'
 import Logo from '@/components/Logo'
 import { useSelector } from 'react-redux'
 import { RootState } from '@/store'
+import { api } from '@/lib/api'
+import type { Airport } from '@/types'
 
 const searchSchema = z.object({
-  from: z.string().min(1, 'Origin is required'),
-  to: z.string().min(1, 'Destination is required'),
+  from: z.number({ required_error: 'Origin is required' }).min(1, 'Origin is required'),
+  to: z.number({ required_error: 'Destination is required' }).min(1, 'Destination is required'),
   departDate: z.string().min(1, 'Departure date is required'),
+  returnDate: z.string().optional(),
   tripType: z.enum(['round', 'oneway']),
+  cabinClass: z.enum(['economy', 'business', 'first']),
   passengers: z.number().min(1).max(9),
   flexibleDates: z.boolean(),
   refundableOnly: z.boolean(),
-})
+}).refine((data) => {
+  if (data.tripType === 'round') return !!data.returnDate?.trim()
+  return true
+}, { message: 'Return date is required for round trip', path: ['returnDate'] })
 
 type SearchFormData = z.infer<typeof searchSchema>
 
@@ -27,6 +34,16 @@ export default function Home() {
   const router = useRouter()
   const { isAuthenticated, user } = useSelector((state: RootState) => state.auth)
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [airports, setAirports] = useState<Airport[]>([])
+
+  useEffect(() => {
+    api.get('/flight/get-all-airports')
+      .then((res: any) => {
+        const data = res?.data?.data ?? res?.data
+        if (Array.isArray(data)) setAirports(data)
+      })
+      .catch(() => setAirports([]))
+  }, [])
 
   const {
     register,
@@ -37,6 +54,7 @@ export default function Home() {
     resolver: zodResolver(searchSchema),
     defaultValues: {
       tripType: 'round',
+      cabinClass: 'economy',
       passengers: 1,
       flexibleDates: false,
       refundableOnly: false,
@@ -45,9 +63,24 @@ export default function Home() {
 
   const tripType = watch('tripType')
 
-  const onSubmit = (data: SearchFormData) => {
-    // Store search params and navigate to results
-    router.push(`/flights/search?from=${data.from}&to=${data.to}&date=${data.departDate}&passengers=${data.passengers}&type=${data.tripType}`)
+  const onSubmit = async (data: SearchFormData) => {
+    try {
+      const body = {
+        type: data.tripType === 'round' ? 'round-trip' : 'one-way',
+        from: data.from,
+        to: data.to,
+        departureDate: data.departDate,
+        returnDate: data.tripType === 'round' ? data.returnDate : undefined,
+        cabinClass: data.cabinClass,
+      }
+      const res: any = await api.post('/flight/search', body)
+      const payload = res?.data?.data ?? res?.data
+      console.log('Search results:', payload)
+      // Optional: still navigate with query params for later use
+      router.push(`/flights/search?from=${data.from}&to=${data.to}&date=${data.departDate}&passengers=${data.passengers}&type=${data.tripType}`)
+    } catch (e) {
+      console.error('Search failed:', e)
+    }
   }
 
   return (
@@ -153,12 +186,17 @@ export default function Home() {
                     <label className="block text-white text-sm font-medium mb-2">
                       From
                     </label>
-                    <input
-                      {...register('from')}
-                      type="text"
-                      placeholder="Your Origin"
-                      className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none bg-white text-gray-800 placeholder-gray-500"
-                    />
+                    <select
+                      {...register('from', { valueAsNumber: true })}
+                      className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none bg-white text-gray-800"
+                    >
+                      <option value={0}>Select origin</option>
+                      {airports.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.code} – {a.city}
+                        </option>
+                      ))}
+                    </select>
                     {errors.from && (
                       <p className="mt-1 text-sm text-red-300">{errors.from.message}</p>
                     )}
@@ -176,12 +214,17 @@ export default function Home() {
                     <label className="block text-white text-sm font-medium mb-2">
                       To
                     </label>
-                    <input
-                      {...register('to')}
-                      type="text"
-                      placeholder="Your Destination"
-                      className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none bg-white text-gray-800 placeholder-gray-500"
-                    />
+                    <select
+                      {...register('to', { valueAsNumber: true })}
+                      className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none bg-white text-gray-800"
+                    >
+                      <option value={0}>Select destination</option>
+                      {airports.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.code} – {a.city}
+                        </option>
+                      ))}
+                    </select>
                     {errors.to && (
                       <p className="mt-1 text-sm text-red-300">{errors.to.message}</p>
                     )}
@@ -217,6 +260,41 @@ export default function Home() {
                     {errors.departDate && (
                       <p className="mt-1 text-sm text-red-300">{errors.departDate.message}</p>
                     )}
+                  </div>
+
+                  {/* Return Date - only for round trip */}
+                  {tripType === 'round' && (
+                    <div className="md:col-span-2">
+                      <label className="block text-white text-sm font-medium mb-2">
+                        Return
+                      </label>
+                      <div className="relative">
+                        <input
+                          {...register('returnDate')}
+                          type="date"
+                          className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none bg-white text-gray-800"
+                        />
+                        <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                      </div>
+                      {errors.returnDate && (
+                        <p className="mt-1 text-sm text-red-300">{errors.returnDate.message}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Cabin Class */}
+                  <div className="md:col-span-2">
+                    <label className="block text-white text-sm font-medium mb-2">
+                      Cabin
+                    </label>
+                    <select
+                      {...register('cabinClass')}
+                      className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none bg-white text-gray-800"
+                    >
+                      <option value="economy">Economy</option>
+                      <option value="business">Business</option>
+                      <option value="first">First</option>
+                    </select>
                   </div>
 
                   {/* Passengers */}

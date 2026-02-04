@@ -32,34 +32,43 @@ func (r *Repository) CreateFlight(flightNumber string, departureAirportID, arriv
 		return nil, err
 	}
 
-	seatRows, err := tx.Query(`SELECT id FROM seats WHERE aircraft_id = $1`, aircraftID)
-	if err != nil {
+	if err := r.insertFlightCabinInventoryTx(tx, flight.ID, aircraftID); err != nil {
 		return nil, err
 	}
-	defer seatRows.Close()
-	for seatRows.Next() {
-		var seatID int
-		if err := seatRows.Scan(&seatID); err != nil {
-			return nil, err
-		}
-		_, err := tx.Exec(
-			`INSERT INTO flight_seats (flight_id, seat_id, is_occupied) VALUES ($1, $2, false)`,
-			flight.ID, seatID,
-		)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if err := seatRows.Err(); err != nil {
-		return nil, err
-	}
-
-	// flight_cabin_inventory is a VIEW derived from flight_seats; no insert needed
 
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	return &flight, nil
+}
+
+// insertFlightCabinInventoryTx inserts flight_cabin_inventory rows from the aircraft's seats (grouped by class). All seats start available.
+func (r *Repository) insertFlightCabinInventoryTx(tx *sql.Tx, flightID, aircraftID int) error {
+	rows, err := tx.Query(
+		`SELECT class, COUNT(*) FROM seats WHERE aircraft_id = $1 GROUP BY class`,
+		aircraftID,
+	)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var class string
+		var count int
+		if err := rows.Scan(&class, &count); err != nil {
+			return err
+		}
+		_, err := tx.Exec(
+			`INSERT INTO flight_cabin_inventory (flight_id, cabin_class, total_seats, available_seats)
+			 VALUES ($1, $2, $3, $4)
+			 ON CONFLICT (flight_id, cabin_class) DO UPDATE SET total_seats = EXCLUDED.total_seats, available_seats = EXCLUDED.available_seats`,
+			flightID, class, count, count,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return rows.Err()
 }
 
 func (r *Repository) GetAllFlights(departureAirportID *int) ([]Flight, error) {
@@ -99,4 +108,84 @@ func (r *Repository) GetAllFlights(departureAirportID *int) ([]Flight, error) {
 	}
 
 	return flights, nil
+}
+
+// BackfillFlightCabinInventory inserts or updates flight_cabin_inventory for every flight from each flight's aircraft seats. Idempotent.
+func (r *Repository) BackfillFlightCabinInventory() (flightsProcessed int, err error) {
+	flights, err := r.GetAllFlights(nil)
+	if err != nil {
+		return 0, err
+	}
+	for _, f := range flights {
+		rows, qerr := r.db.Query(
+			`SELECT class, COUNT(*) FROM seats WHERE aircraft_id = $1 GROUP BY class`,
+			f.AircraftID,
+		)
+		if qerr != nil {
+			continue
+		}
+		for rows.Next() {
+			var class string
+			var count int
+			if qerr := rows.Scan(&class, &count); qerr != nil {
+				rows.Close()
+				continue
+			}
+			_, _ = r.db.Exec(
+				`INSERT INTO flight_cabin_inventory (flight_id, cabin_class, total_seats, available_seats)
+				 VALUES ($1, $2, $3, $4)
+				 ON CONFLICT (flight_id, cabin_class) DO UPDATE SET total_seats = EXCLUDED.total_seats, available_seats = EXCLUDED.available_seats`,
+				f.ID, class, count, count,
+			)
+		}
+		rows.Close()
+		flightsProcessed++
+	}
+	return flightsProcessed, nil
+}
+
+// SearchFlightRow is a single row returned by flight search (with airport codes and cabin availability).
+type SearchFlightRow struct {
+	ID                   int       `json:"id"`
+	FlightNumber         string    `json:"flight_number"`
+	DepartureAirportCode string    `json:"departure_airport_code"`
+	ArrivalAirportCode   string    `json:"arrival_airport_code"`
+	DepartureTime        time.Time `json:"departure_time"`
+	ArrivalTime          time.Time `json:"arrival_time"`
+	BasePrice            float64   `json:"base_price"`
+	AvailableSeats       int       `json:"available_seats"`
+	CabinClass           string    `json:"cabin_class"`
+}
+
+// SearchFlights returns flights from→to on the given date with available seats in the requested cabin class.
+func (r *Repository) SearchFlights(fromAirportID, toAirportID int, date string, cabinClass string) ([]SearchFlightRow, error) {
+	rows, err := r.db.Query(`
+		SELECT f.id, f.flight_number,
+		       dep.code AS departure_airport_code, arr.code AS arrival_airport_code,
+		       f.departure_time, f.arrival_time, f.base_price,
+		       fci.available_seats, fci.cabin_class
+		FROM flights f
+		JOIN airports dep ON dep.id = f.departure_airport_id
+		JOIN airports arr ON arr.id = f.arrival_airport_id
+		JOIN flight_cabin_inventory fci ON fci.flight_id = f.id AND fci.cabin_class = $4 AND fci.available_seats > 0
+		WHERE f.departure_airport_id = $1 AND f.arrival_airport_id = $2
+		  AND f.status = 'scheduled'
+		  AND DATE(f.departure_time) = $3
+		ORDER BY f.departure_time`,
+		fromAirportID, toAirportID, date, cabinClass,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []SearchFlightRow
+	for rows.Next() {
+		var row SearchFlightRow
+		if err := rows.Scan(&row.ID, &row.FlightNumber, &row.DepartureAirportCode, &row.ArrivalAirportCode,
+			&row.DepartureTime, &row.ArrivalTime, &row.BasePrice, &row.AvailableSeats, &row.CabinClass); err != nil {
+			return nil, err
+		}
+		list = append(list, row)
+	}
+	return list, rows.Err()
 }
