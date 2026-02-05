@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -35,6 +35,7 @@ export default function Home() {
   const { isAuthenticated, user } = useSelector((state: RootState) => state.auth)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [airports, setAirports] = useState<Airport[]>([])
+  const [arrivalAirportIds, setArrivalAirportIds] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     api.get('/flight/get-all-airports')
@@ -49,10 +50,13 @@ export default function Home() {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<SearchFormData>({
     resolver: zodResolver(searchSchema),
     defaultValues: {
+      from: 0,
+      to: 0,
       tripType: 'round',
       cabinClass: 'economy',
       passengers: 1,
@@ -62,6 +66,34 @@ export default function Home() {
   })
 
   const tripType = watch('tripType')
+  const fromId = watch('from')
+
+  // When "From" changes: reset "To" and fetch arrival airports from get-all-flights by departure_airport_id
+  useEffect(() => {
+    if (!fromId || fromId === 0) {
+      setArrivalAirportIds(new Set())
+      setValue('to', 0)
+      return
+    }
+    setValue('to', 0)
+    api.get(`/flight/get-all-flights?departure_airport_id=${fromId}`)
+      .then((res: any) => {
+        const raw = res?.data?.data ?? res?.data
+        const flights = Array.isArray(raw) ? raw : []
+        const ids = new Set(
+          flights
+            .map((f: { arrival_airport_id?: number }) => f.arrival_airport_id)
+            .filter((id): id is number => typeof id === 'number')
+        )
+        setArrivalAirportIds(ids)
+      })
+      .catch(() => setArrivalAirportIds(new Set()))
+  }, [fromId, setValue])
+
+  const destinationAirports = useMemo(
+    () => airports.filter((a) => arrivalAirportIds.has(a.id)),
+    [airports, arrivalAirportIds]
+  )
 
   const onSubmit = async (data: SearchFormData) => {
     try {
@@ -73,11 +105,17 @@ export default function Home() {
         returnDate: data.tripType === 'round' ? data.returnDate : undefined,
         cabinClass: data.cabinClass,
       }
+      console.log("Body = ", body)
       const res: any = await api.post('/flight/search', body)
+      console.log("Res = ", res)
       const payload = res?.data?.data ?? res?.data
       console.log('Search results:', payload)
       // Optional: still navigate with query params for later use
-      router.push(`/flights/search?from=${data.from}&to=${data.to}&date=${data.departDate}&passengers=${data.passengers}&type=${data.tripType}`)
+      router.push(
+        `/flights/search?from=${data.from}&to=${data.to}&date=${data.departDate}&passengers=${data.passengers}&type=${data.tripType}` +
+        (data.tripType === 'round' && data.returnDate ? `&returnDate=${data.returnDate}` : '') +
+        `&cabinClass=${data.cabinClass}`
+      )
     } catch (e) {
       console.error('Search failed:', e)
     }
@@ -209,17 +247,20 @@ export default function Home() {
                     </div>
                   </div>
 
-                  {/* To */}
+                  {/* To - only destinations that have flights from selected origin */}
                   <div className="md:col-span-3">
                     <label className="block text-white text-sm font-medium mb-2">
                       To
                     </label>
                     <select
                       {...register('to', { valueAsNumber: true })}
-                      className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none bg-white text-gray-800"
+                      disabled={!fromId || fromId === 0}
+                      className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none bg-white text-gray-800 disabled:bg-gray-200 disabled:cursor-not-allowed"
                     >
-                      <option value={0}>Select destination</option>
-                      {airports.map((a) => (
+                      <option value={0}>
+                        {fromId ? 'Select destination' : 'Select origin first'}
+                      </option>
+                      {destinationAirports.map((a) => (
                         <option key={a.id} value={a.id}>
                           {a.code} – {a.city}
                         </option>

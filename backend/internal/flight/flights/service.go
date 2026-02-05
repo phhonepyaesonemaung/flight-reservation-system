@@ -68,12 +68,12 @@ func (s *Service) BackfillFlightCabinInventory() (flightsProcessed int, err erro
 
 // SearchFlightsRequest is the body for the flight search endpoint.
 type SearchFlightsRequest struct {
-	Type          string `json:"type"`           // "one-way" or "round-trip"
-	From          int    `json:"from"`            // departure airport ID
-	To            int    `json:"to"`              // arrival airport ID
-	DepartureDate string `json:"departureDate"`   // YYYY-MM-DD
-	ReturnDate    string `json:"returnDate"`      // YYYY-MM-DD, required if round-trip
-	CabinClass    string `json:"cabinClass"`      // economy, business, first
+	Type          string `json:"type"`          // "one-way" or "round-trip"
+	From          int    `json:"from"`          // departure airport ID
+	To            int    `json:"to"`            // arrival airport ID
+	DepartureDate string `json:"departureDate"` // YYYY-MM-DD
+	ReturnDate    string `json:"returnDate"`    // YYYY-MM-DD, required if round-trip
+	CabinClass    string `json:"cabinClass"`    // economy, business, first
 }
 
 // SearchFlightsResponse is the search endpoint response.
@@ -101,6 +101,9 @@ func (s *Service) SearchFlights(req *SearchFlightsRequest) (*SearchFlightsRespon
 	if err != nil {
 		return nil, err
 	}
+	if outbound == nil {
+		outbound = []SearchFlightRow{}
+	}
 	resp := &SearchFlightsResponse{Outbound: outbound}
 	if req.Type == "round-trip" {
 		if req.ReturnDate == "" {
@@ -109,6 +112,9 @@ func (s *Service) SearchFlights(req *SearchFlightsRequest) (*SearchFlightsRespon
 		returnFlights, err := s.repo.SearchFlights(req.To, req.From, req.ReturnDate, cabin)
 		if err != nil {
 			return nil, err
+		}
+		if returnFlights == nil {
+			returnFlights = []SearchFlightRow{}
 		}
 		resp.Return = returnFlights
 	}
