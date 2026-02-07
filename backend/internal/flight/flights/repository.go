@@ -51,24 +51,40 @@ func (r *Repository) insertFlightCabinInventoryTx(tx *sql.Tx, flightID, aircraft
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	var classes []struct {
+		class string
+		count int
+	}
 	for rows.Next() {
-		var class string
-		var count int
-		if err := rows.Scan(&class, &count); err != nil {
+		var c string
+		var n int
+		if err := rows.Scan(&c, &n); err != nil {
+			rows.Close()
 			return err
 		}
+		classes = append(classes, struct {
+			class string
+			count int
+		}{c, n})
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, cc := range classes {
 		_, err := tx.Exec(
 			`INSERT INTO flight_cabin_inventory (flight_id, cabin_class, total_seats, available_seats)
 			 VALUES ($1, $2, $3, $4)
 			 ON CONFLICT (flight_id, cabin_class) DO UPDATE SET total_seats = EXCLUDED.total_seats, available_seats = EXCLUDED.available_seats`,
-			flightID, class, count, count,
+			flightID, cc.class, cc.count, cc.count,
 		)
 		if err != nil {
 			return err
 		}
 	}
-	return rows.Err()
+	return nil
 }
 
 func (r *Repository) GetAllFlights(departureAirportID *int) ([]Flight, error) {

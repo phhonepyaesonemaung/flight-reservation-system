@@ -47,7 +47,7 @@ func (s *Service) CreateFlight(req *CreateFlightRequest) (*Flight, error) {
 		status,
 	)
 	if err != nil {
-		return nil, errors.New("failed to create flight")
+		return nil, errors.New("failed to create flight : " + err.Error())
 	}
 
 	return flight, nil
