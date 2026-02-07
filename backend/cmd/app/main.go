@@ -63,6 +63,20 @@ func main() {
 		response.Success(w, http.StatusOK, "success", map[string]string{"status": "ok"})
 	})
 
+	// Reset sequences after importing data with explicit IDs (avoids "duplicate key id" on create)
+	http.HandleFunc("/api/data/reset-sequences", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			response.Error(w, http.StatusMethodNotAllowed, "Method not allowed")
+			return
+		}
+		if err := database.ResetSequences(); err != nil {
+			log.Printf("Reset sequences error: %v", err)
+			response.Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		response.Success(w, http.StatusOK, "Sequences reset successfully; new creates will get the next ids.", nil)
+	})
+
 	// Start server with CORS middleware
 	port := getEnv("PORT", "8080")
 	allowedOrigin := getEnv("CORS_ORIGIN", "http://localhost:3000")

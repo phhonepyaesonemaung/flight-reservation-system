@@ -17,26 +17,26 @@ services:
       timeout: 5s
       retries: 5
 
-  # app:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #   container_name: aerolink-backend
-  #   environment:
-  #     DB_HOST: postgres
-  #     DB_PORT: 5432
-  #     DB_USER: postgres
-  #     DB_PASSWORD: postgres
-  #     DB_NAME: aerolink_db
-  #     PORT: 8080
-  #     JWT_ACCESS_SECRET: 1027134e969f2635b5933c46a2a637ab8d10e1d7944393049c02bfd3d30aae68ececab1e6d7611def681fdd0a5edb8231fb1e70916d49629bdeb5cf9baa5e85b
-  #     JWT_REFRESH_SECRET: 73cc2d61bdc3d3cb2dcd7b9c3512db737fb9decb77383f44fd7e85512cfa2c19e0ad84c8c4733075572dda9cbd089ddb26f395714d7be33582bbc6ab98d85926
-  #   ports:
-  #     - "8080:8080"
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #   restart: unless-stopped
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aerolink-backend
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: aerolink_db
+      PORT: 8080
+      JWT_ACCESS_SECRET: 1027134e969f2635b5933c46a2a637ab8d10e1d7944393049c02bfd3d30aae68ececab1e6d7611def681fdd0a5edb8231fb1e70916d49629bdeb5cf9baa5e85b
+      JWT_REFRESH_SECRET: 73cc2d61bdc3d3cb2dcd7b9c3512db737fb9decb77383f44fd7e85512cfa2c19e0ad84c8c4733075572dda9cbd089ddb26f395714d7be33582bbc6ab98d85926
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   postgres_data:

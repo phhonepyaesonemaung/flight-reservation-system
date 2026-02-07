@@ -55,3 +55,15 @@
    ```bash
    go run cmd/app/main.go
    ```
+
+## 📥 Data import and "duplicate key" fix
+
+If you **import data** (e.g. from an export) with explicit IDs, PostgreSQL’s sequences are not updated. The next create (flight, airport, etc.) can then try to use id `1` again and fail with a duplicate key error.
+
+**After importing data**, reset sequences once:
+
+```bash
+curl -X POST http://localhost:8080/api/data/reset-sequences
+```
+
+Then creating new records via the API will use the next available IDs.

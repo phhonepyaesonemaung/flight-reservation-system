@@ -252,6 +252,26 @@ func createBookingTables() error {
 	return nil
 }
 
+// ResetSequences sets all SERIAL sequences to the current MAX(id) for each table.
+// Call this after importing data with explicit IDs so the next INSERT gets a new id.
+// Without this, imported rows (e.g. id=1,2,3) leave the sequence at 1 and the next
+// create hits "duplicate key value violates unique constraint" on id.
+func ResetSequences() error {
+	tables := []string{
+		"users", "airports", "aircraft", "flights", "seats",
+		"flight_seats", "flight_cabin_inventory", "bookings",
+	}
+	for _, table := range tables {
+		// setval(seq, max_id) so next nextval() returns max_id+1
+		q := `SELECT setval(pg_get_serial_sequence($1, 'id'), COALESCE((SELECT MAX(id) FROM ` + table + `), 1))`
+		if _, err := DB.Exec(q, table); err != nil {
+			return fmt.Errorf("reset sequence for %s: %w", table, err)
+		}
+		log.Printf("Reset sequence for table %s", table)
+	}
+	return nil
+}
+
 func CloseDB() error {
 	if DB != nil {
 		return DB.Close()
