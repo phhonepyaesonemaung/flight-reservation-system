@@ -6,15 +6,16 @@ import (
 
 // User represents a user in the database
 type User struct {
-	ID           int       `json:"id"`
-	FirstName    string    `json:"first_name"`
-	LastName     string    `json:"last_name"`
-	Username     string    `json:"username"`
-	Email        string    `json:"email"`
-	Phone        string    `json:"phone"`
-	PasswordHash string    `json:"-"` // Never return password in JSON
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID              int        `json:"id"`
+	FirstName       string     `json:"first_name"`
+	LastName        string     `json:"last_name"`
+	Username        string     `json:"username"`
+	Email           string     `json:"email"`
+	Phone           string     `json:"phone"`
+	PasswordHash    string     `json:"-"`
+	EmailVerifiedAt *time.Time `json:"email_verified_at,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
 }
 
 // UserResponse represents the user data returned in API responses

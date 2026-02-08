@@ -35,6 +35,9 @@ func (r *Repository) CreateFlight(flightNumber string, departureAirportID, arriv
 	if err := r.insertFlightCabinInventoryTx(tx, flight.ID, aircraftID); err != nil {
 		return nil, err
 	}
+	if err := r.insertFlightSeatsTx(tx, flight.ID, aircraftID); err != nil {
+		return nil, err
+	}
 
 	if err := tx.Commit(); err != nil {
 		return nil, err
@@ -85,6 +88,17 @@ func (r *Repository) insertFlightCabinInventoryTx(tx *sql.Tx, flightID, aircraft
 		}
 	}
 	return nil
+}
+
+// insertFlightSeatsTx inserts one flight_seats row per seat of the aircraft, all available (is_occupied = false).
+func (r *Repository) insertFlightSeatsTx(tx *sql.Tx, flightID, aircraftID int) error {
+	_, err := tx.Exec(
+		`INSERT INTO flight_seats (flight_id, seat_id, is_occupied)
+		 SELECT $1, id, false FROM seats WHERE aircraft_id = $2
+		 ON CONFLICT (flight_id, seat_id) DO NOTHING`,
+		flightID, aircraftID,
+	)
+	return err
 }
 
 func (r *Repository) GetAllFlights(departureAirportID *int) ([]Flight, error) {

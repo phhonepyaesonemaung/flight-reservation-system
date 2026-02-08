@@ -33,7 +33,7 @@ export default function FlightDetailsPage() {
   }
 
   const handleSelectFlight = () => {
-    router.push(`/booking/seats/${flightId}`)
+    router.push(`/booking/passengers/${flightId}?passengers=1&cabinClass=economy`)
   }
 
   return (

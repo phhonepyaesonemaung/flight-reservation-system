@@ -1,11 +1,15 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"regexp"
 	"strings"
+	"time"
 
 	"aerolink_backend/package/jwt"
+	"aerolink_backend/package/mail"
 	"aerolink_backend/package/password"
 )
 
@@ -41,7 +45,12 @@ type AuthResponse struct {
 	User         *UserResponse `json:"user"`
 }
 
-func (s *Service) Signup(req *SignupRequest) (*AuthResponse, error) {
+// SignupMessageResponse is returned on signup when email verification is required (no tokens).
+type SignupMessageResponse struct {
+	Message string `json:"message"`
+}
+
+func (s *Service) Signup(req *SignupRequest) (interface{}, error) {
 	if err := validateSignupRequest(req); err != nil {
 		return nil, err
 	}
@@ -80,23 +89,32 @@ func (s *Service) Signup(req *SignupRequest) (*AuthResponse, error) {
 		return nil, errors.New("failed to create user")
 	}
 
-	accessToken, err := jwt.GenerateAccessToken(user.ID)
+	token, err := generateSecureToken()
 	if err != nil {
-		return nil, errors.New("failed to generate access token")
+		return nil, errors.New("failed to generate verification token")
+	}
+	expiresAt := time.Now().Add(24 * time.Hour)
+	if err := s.repo.CreateVerificationToken(user.ID, token, expiresAt); err != nil {
+		return nil, errors.New("failed to create verification token")
+	}
+	if err := mail.SendVerificationEmail(user.Email, token); err != nil {
+		// In development without SMTP configured, mark user verified so they can sign in
+		if mail.SendingDisabled() {
+			_ = s.repo.MarkEmailVerified(user.ID)
+			return &SignupMessageResponse{Message: "Account created. Email sending is disabled (no SMTP); you can sign in now."}, nil
+		}
+		return nil, errors.New("failed to send verification email; account was created—please contact support or try signing in later")
 	}
 
-	refreshToken, err := jwt.GenerateRefreshToken(user.ID)
-	if err != nil {
-		return nil, errors.New("failed to generate refresh token")
-	}
+	return &SignupMessageResponse{Message: "Check your email to verify your account. The link expires in 24 hours."}, nil
+}
 
-	response := &AuthResponse{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		User:         user.ToResponse(),
+func generateSecureToken() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
 	}
-
-	return response, nil
+	return hex.EncodeToString(b), nil
 }
 
 func (s *Service) Signin(req *SigninRequest) (*AuthResponse, error) {
@@ -106,11 +124,15 @@ func (s *Service) Signin(req *SigninRequest) (*AuthResponse, error) {
 
 	user, err := s.repo.FindByUsername(req.Username)
 	if err != nil {
-		return nil, errors.New("invalid username")
+		return nil, errors.New("invalid username or password")
+	}
+
+	if user.EmailVerifiedAt == nil {
+		return nil, errors.New("email not verified; please check your inbox for the verification link")
 	}
 
 	if !password.ComparePassword(user.PasswordHash, req.Password) {
-		return nil, errors.New("invalid password")
+		return nil, errors.New("invalid username or password")
 	}
 
 	accessToken, err := jwt.GenerateAccessToken(user.ID)
@@ -164,6 +186,37 @@ func (s *Service) RefreshToken(req *RefreshTokenRequest) (*AuthResponse, error) 
 	}
 
 	return response, nil
+}
+
+// VerifyEmail consumes the token, marks the user as verified, and returns auth tokens so the user can be signed in.
+func (s *Service) VerifyEmail(token string) (*AuthResponse, error) {
+	if strings.TrimSpace(token) == "" {
+		return nil, errors.New("verification token is required")
+	}
+	userID, err := s.repo.GetUserIDByToken(token)
+	if err != nil {
+		return nil, errors.New("invalid or expired verification link")
+	}
+	if err := s.repo.MarkEmailVerified(userID); err != nil {
+		return nil, errors.New("failed to verify email")
+	}
+	user, err := s.repo.FindByID(userID)
+	if err != nil {
+		return nil, errors.New("user not found")
+	}
+	accessToken, err := jwt.GenerateAccessToken(user.ID)
+	if err != nil {
+		return nil, errors.New("failed to generate access token")
+	}
+	refreshToken, err := jwt.GenerateRefreshToken(user.ID)
+	if err != nil {
+		return nil, errors.New("failed to generate refresh token")
+	}
+	return &AuthResponse{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		User:         user.ToResponse(),
+	}, nil
 }
 
 func validateSignupRequest(req *SignupRequest) error {

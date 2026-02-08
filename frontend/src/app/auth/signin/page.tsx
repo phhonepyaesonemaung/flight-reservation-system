@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useDispatch } from 'react-redux'
 import { useForm } from 'react-hook-form'
@@ -24,6 +24,8 @@ type SignInFormData = z.infer<typeof signInSchema>
 
 export default function SignInPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get('redirect') || '/'
   const dispatch = useDispatch()
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -44,22 +46,35 @@ export default function SignInPage() {
         password: data.password,
       })
 
-      const { user, token } = response.data
+      const payload = response.data?.data ?? response.data
+      const rawUser = payload?.user
+      const token = payload?.access_token ?? payload?.token
 
-      // Store token
+      if (!rawUser || !token) {
+        toast.error('Invalid response from server')
+        return
+      }
+
+      const user = {
+        id: String(rawUser.id),
+        email: rawUser.email ?? '',
+        firstName: rawUser.first_name ?? rawUser.firstName ?? '',
+        lastName: rawUser.last_name ?? rawUser.lastName ?? '',
+        role: (rawUser.role as 'user' | 'admin') ?? 'user',
+      }
+
       if (data.rememberMe) {
         localStorage.setItem('token', token)
       } else {
         sessionStorage.setItem('token', token)
       }
 
-      // Update Redux store
       dispatch(setCredentials({ user, token }))
-
       toast.success('Welcome back!')
-      router.push('/dashboard')
+      router.push(redirectTo)
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Invalid credentials')
+      const msg = error.response?.data?.error ?? error.response?.data?.message ?? 'Invalid credentials'
+      toast.error(msg)
     } finally {
       setIsLoading(false)
     }
@@ -121,7 +136,7 @@ export default function SignInPage() {
                   type="text"
                   id="username"
                   placeholder="Enter a Username"
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200 outline-none bg-white/80"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200 outline-none bg-white/80 text-gray-900"
                 />
                 {errors.username && (
                   <p className="mt-1 text-sm text-red-600">{errors.username.message}</p>
@@ -139,7 +154,7 @@ export default function SignInPage() {
                     type={showPassword ? 'text' : 'password'}
                     id="password"
                     placeholder="Enter a Password"
-                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200 outline-none bg-white/80 pr-12"
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200 outline-none bg-white/80 pr-12 text-gray-900"
                   />
                   <button
                     type="button"

@@ -9,6 +9,9 @@ import { z } from 'zod'
 import Logo from '@/components/Logo'
 import { ArrowLeft, CreditCard, Lock } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { api } from '@/lib/api'
+
+const BOOKING_PASSENGER_KEY = 'booking_passenger'
 
 const paymentSchema = z.object({
   cardNumber: z.string().min(16, 'Invalid card number'),
@@ -24,8 +27,9 @@ export default function PaymentPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const flightId = params.id
-  const seats = searchParams.get('seats')?.split(',') || []
   const [isProcessing, setIsProcessing] = useState(false)
+
+  const backToPassengersHref = `/booking/passengers/${flightId}?passengers=${searchParams.get('passengers') || '1'}&cabinClass=${searchParams.get('cabinClass') || 'economy'}`
 
   const {
     register,
@@ -35,18 +39,55 @@ export default function PaymentPage() {
     resolver: zodResolver(paymentSchema),
   })
 
-  // Mock pricing
+  // Pricing (total_amount sent to backend; display can be from flight or fixed for now)
   const flightPrice = 250
   const taxes = 35
   const total = flightPrice + taxes
 
   const onSubmit = async (data: PaymentFormData) => {
     setIsProcessing(true)
-    // Simulate payment processing
-    setTimeout(() => {
-      toast.success('Payment successful!')
-      router.push(`/booking/confirmation/${flightId}`)
-    }, 2000)
+    try {
+      const passengerJson = typeof window !== 'undefined' ? sessionStorage.getItem(BOOKING_PASSENGER_KEY) : null
+      const passenger = passengerJson ? JSON.parse(passengerJson) : null
+      if (!passenger) {
+        toast.error('Passenger details missing. Please go back and enter passenger information.')
+        setIsProcessing(false)
+        return
+      }
+      const passengersPayload = [
+        {
+          first_name: passenger.firstName,
+          last_name: passenger.lastName,
+          email: passenger.email,
+          phone: passenger.phone,
+          date_of_birth: passenger.dateOfBirth,
+          passport_number: passenger.passportNumber || undefined,
+        },
+      ]
+      const res = await api.post('/booking/create', {
+        flight_id: parseInt(String(flightId), 10),
+        cabin_class: searchParams.get('cabinClass') || 'economy',
+        total_amount: total,
+        passengers: passengersPayload,
+      })
+      const payload = res.data?.data ?? res.data
+      const bookingId = payload?.booking_id
+      const bookingRef = payload?.booking_reference
+      if (bookingId != null) {
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('booking_confirmation', JSON.stringify({ bookingId, bookingRef }))
+        }
+        toast.success('Booking confirmed!')
+        router.push('/')
+      } else {
+        toast.error('Booking created but invalid response')
+      }
+    } catch (err: any) {
+      const msg = err.response?.data?.error ?? err.response?.data?.message ?? 'Payment failed'
+      toast.error(msg)
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   return (
@@ -61,9 +102,9 @@ export default function PaymentPage() {
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 py-8">
         {/* Back Button */}
-        <Link href={`/booking/passengers/${flightId}?seats=${seats.join(',')}`} className="inline-flex items-center text-primary-600 hover:text-primary-700 mb-6">
+        <Link href={backToPassengersHref} className="inline-flex items-center text-primary-600 hover:text-primary-700 mb-6">
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Passenger Info
+          Back to Passenger Details
         </Link>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -176,16 +217,12 @@ export default function PaymentPage() {
             
             <div className="space-y-3 mb-6">
               <div className="flex justify-between text-gray-700">
-                <span>Flight (AEROLINK AL 101)</span>
+                <span>Flight (AEROLINK)</span>
                 <span className="font-semibold">${flightPrice}</span>
               </div>
               <div className="flex justify-between text-gray-700">
                 <span>Taxes & Fees</span>
                 <span className="font-semibold">${taxes}</span>
-              </div>
-              <div className="flex justify-between text-gray-700">
-                <span>Selected Seats</span>
-                <span className="font-semibold">{seats.join(', ')}</span>
               </div>
             </div>
 

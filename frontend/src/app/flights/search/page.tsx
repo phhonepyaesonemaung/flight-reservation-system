@@ -3,6 +3,8 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { useSelector } from 'react-redux'
+import type { RootState } from '@/store'
 import Logo from '@/components/Logo'
 import { Plane, Clock, DollarSign } from 'lucide-react'
 import { api } from '@/lib/api'
@@ -34,10 +36,12 @@ function FlightCard({
   flight,
   fromLabel,
   toLabel,
+  selectFlightHref,
 }: {
   flight: SearchFlightRow
   fromLabel: string
   toLabel: string
+  selectFlightHref: string
 }) {
   return (
     <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition">
@@ -91,7 +95,7 @@ function FlightCard({
           </div>
           <p className="text-sm text-gray-500 mb-4">per person</p>
           <Link
-            href="/auth/signin"
+            href={selectFlightHref}
             className="inline-block bg-accent hover:bg-accent-hover text-white px-8 py-3 rounded-lg font-semibold transition shadow-md hover:shadow-lg"
           >
             Select Flight
@@ -146,12 +150,24 @@ function SearchResults() {
       .finally(() => setLoading(false))
   }, [from, to, date, returnDate, type, cabinClass])
 
+  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated)
   const outbound = data?.outbound ?? []
   const returnFlights = data?.return ?? []
   const fromCode = outbound[0]?.departure_airport_code ?? from ?? '—'
   const toCode = outbound[0]?.arrival_airport_code ?? to ?? '—'
   const fromLabel = fromCode
   const toLabel = toCode
+
+  const buildSelectFlightHref = (flightId: number) => {
+    const bookingPath = `/booking/passengers/${flightId}`
+    const params = new URLSearchParams()
+    if (passengers) params.set('passengers', passengers)
+    if (cabinClass) params.set('cabinClass', cabinClass)
+    const qs = params.toString()
+    const bookingUrl = qs ? `${bookingPath}?${qs}` : bookingPath
+    if (isAuthenticated) return bookingUrl
+    return `/auth/signin?redirect=${encodeURIComponent(bookingUrl)}`
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -210,6 +226,7 @@ function SearchResults() {
                       flight={flight}
                       fromLabel={fromLabel}
                       toLabel={toLabel}
+                      selectFlightHref={buildSelectFlightHref(flight.id)}
                     />
                   ))}
                 </div>
@@ -223,16 +240,17 @@ function SearchResults() {
                 {returnFlights.length === 0 ? (
                   <p className="text-gray-500">No return flights found for this date.</p>
                 ) : (
-                  <div className="space-y-4">
-                    {returnFlights.map((flight) => (
-                      <FlightCard
-                        key={flight.id}
-                        flight={flight}
-                        fromLabel={toLabel}
-                        toLabel={fromLabel}
-                      />
-                    ))}
-                  </div>
+                <div className="space-y-4">
+                  {returnFlights.map((flight) => (
+                    <FlightCard
+                      key={flight.id}
+                      flight={flight}
+                      fromLabel={toLabel}
+                      toLabel={fromLabel}
+                      selectFlightHref={buildSelectFlightHref(flight.id)}
+                    />
+                  ))}
+                </div>
                 )}
               </section>
             )}

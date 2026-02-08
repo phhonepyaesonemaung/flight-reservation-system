@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
@@ -21,12 +20,15 @@ const passengerSchema = z.object({
 
 type PassengerFormData = z.infer<typeof passengerSchema>
 
+const BOOKING_PASSENGER_KEY = 'booking_passenger'
+
 export default function PassengerInfoPage() {
   const params = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const flightId = params.id
-  const seats = searchParams.get('seats')?.split(',') || []
+  const flightId = params.id as string
+  const passengersCount = Math.max(1, parseInt(searchParams.get('passengers') || '1', 10))
+  const cabinClass = searchParams.get('cabinClass') || 'economy'
 
   const {
     register,
@@ -37,9 +39,14 @@ export default function PassengerInfoPage() {
   })
 
   const onSubmit = (data: PassengerFormData) => {
-    // Store passenger data and navigate to payment
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem(BOOKING_PASSENGER_KEY, JSON.stringify(data))
+    }
     toast.success('Passenger information saved')
-    router.push(`/booking/payment/${flightId}?seats=${seats.join(',')}`)
+    const params = new URLSearchParams()
+    params.set('passengers', String(passengersCount))
+    params.set('cabinClass', cabinClass)
+    router.push(`/booking/payment/${flightId}?${params.toString()}`)
   }
 
   return (
@@ -54,14 +61,16 @@ export default function PassengerInfoPage() {
       {/* Main Content */}
       <main className="max-w-4xl mx-auto px-4 py-8">
         {/* Back Button */}
-        <Link href={`/booking/seats/${flightId}`} className="inline-flex items-center text-primary-600 hover:text-primary-700 mb-6">
+        <Link href="/flights/search" className="inline-flex items-center text-primary-600 hover:text-primary-700 mb-6">
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Seat Selection
+          Back to Search Results
         </Link>
 
         <div className="bg-white rounded-lg shadow-lg p-8">
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Passenger Information</h2>
-          <p className="text-gray-600 mb-6">Please provide passenger details for seat(s): {seats.join(', ')}</p>
+          <p className="text-gray-600 mb-6">
+            Please provide passenger details for {passengersCount} passenger{passengersCount > 1 ? 's' : ''}.
+          </p>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             {/* Name Fields */}

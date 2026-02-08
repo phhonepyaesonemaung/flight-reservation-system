@@ -30,6 +30,10 @@ func InitDB(host, port, user, password, dbname string) error {
 	if err := createUsersTable(); err != nil {
 		return fmt.Errorf("failed to create users table: %w", err)
 	}
+	// Add email verification schema (column + tokens table)
+	if err := ensureEmailVerificationSchema(); err != nil {
+		return fmt.Errorf("failed to ensure email verification schema: %w", err)
+	}
 
 	// Create flight tables if it doesn't exist
 	if err := createFlightTables(); err != nil {
@@ -68,6 +72,31 @@ func createUsersTable() error {
 	}
 
 	log.Println("Users table initialized successfully")
+	return nil
+}
+
+func ensureEmailVerificationSchema() error {
+	// Add email_verified_at if not present (e.g. existing DBs)
+	// Add column for existing DBs (PostgreSQL 9.5+; for older use: DO $$ BEGIN ALTER TABLE users ADD COLUMN email_verified_at TIMESTAMP NULL; EXCEPTION WHEN duplicate_column THEN NULL; END $$;)
+	_, _ = DB.Exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMP NULL`)
+	// Treat existing users as already verified so they can still sign in
+	_, _ = DB.Exec(`UPDATE users SET email_verified_at = COALESCE(updated_at, created_at) WHERE email_verified_at IS NULL`)
+	query := `
+	CREATE TABLE IF NOT EXISTS email_verification_tokens (
+		id SERIAL PRIMARY KEY,
+		user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		token VARCHAR(255) UNIQUE NOT NULL,
+		expires_at TIMESTAMP NOT NULL,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_token ON email_verification_tokens(token);
+	CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_expires ON email_verification_tokens(expires_at);
+	`
+	_, err := DB.Exec(query)
+	if err != nil {
+		return err
+	}
+	log.Println("Email verification schema ready")
 	return nil
 }
 
@@ -241,6 +270,21 @@ func createBookingTables() error {
 
     PRIMARY KEY (booking_id, flight_id)
 	);
+
+	-- Booking Passengers table (passenger details per booking)
+	CREATE TABLE IF NOT EXISTS booking_passengers (
+    id SERIAL PRIMARY KEY,
+    booking_id INT NOT NULL
+        REFERENCES bookings(id) ON DELETE CASCADE,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    phone VARCHAR(100) NOT NULL,
+    date_of_birth DATE,
+    passport_number VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_booking_passengers_booking_id ON booking_passengers(booking_id);
 	`
 
 	_, err := DB.Exec(query)
@@ -260,6 +304,7 @@ func ResetSequences() error {
 	tables := []string{
 		"users", "airports", "aircraft", "flights", "seats",
 		"flight_seats", "flight_cabin_inventory", "bookings",
+		"booking_passengers", "email_verification_tokens",
 	}
 	for _, table := range tables {
 		// setval(seq, max_id) so next nextval() returns max_id+1
