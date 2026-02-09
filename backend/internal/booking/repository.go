@@ -11,6 +11,14 @@ type Repository struct {
 	db *sql.DB
 }
 
+type FlightReceiptInfo struct {
+	FlightNumber         string
+	DepartureAirportCode string
+	ArrivalAirportCode   string
+	DepartureTime        time.Time
+	ArrivalTime          time.Time
+}
+
 func NewRepository(db *sql.DB) *Repository {
 	return &Repository{db: db}
 }
@@ -20,6 +28,32 @@ func (r *Repository) GetFlightBasePrice(flightID int) (float64, error) {
 	var price float64
 	err := r.db.QueryRow("SELECT base_price FROM flights WHERE id = $1", flightID).Scan(&price)
 	return price, err
+}
+
+func (r *Repository) GetUserEmail(userID int) (string, error) {
+	var email string
+	err := r.db.QueryRow("SELECT email FROM users WHERE id = $1", userID).Scan(&email)
+	return email, err
+}
+
+func (r *Repository) GetFlightReceiptInfo(flightID int) (*FlightReceiptInfo, error) {
+	var info FlightReceiptInfo
+	err := r.db.QueryRow(`
+		SELECT f.flight_number,
+		       dep.code AS departure_airport_code,
+		       arr.code AS arrival_airport_code,
+		       f.departure_time,
+		       f.arrival_time
+		FROM flights f
+		JOIN airports dep ON dep.id = f.departure_airport_id
+		JOIN airports arr ON arr.id = f.arrival_airport_id
+		WHERE f.id = $1`,
+		flightID,
+	).Scan(&info.FlightNumber, &info.DepartureAirportCode, &info.ArrivalAirportCode, &info.DepartureTime, &info.ArrivalTime)
+	if err != nil {
+		return nil, err
+	}
+	return &info, nil
 }
 
 // CreateBooking creates a new booking with booking_flights and booking_passengers. Returns booking ID and reference.

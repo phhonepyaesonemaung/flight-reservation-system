@@ -74,12 +74,16 @@ export default function PaymentPage() {
       const payload = res.data?.data ?? res.data
       const bookingId = payload?.booking_id
       const bookingRef = payload?.booking_reference
+      const receipt = payload?.receipt
       if (bookingId != null) {
         if (typeof window !== 'undefined') {
           sessionStorage.setItem('booking_confirmation', JSON.stringify({ bookingId, bookingRef }))
+          if (receipt) {
+            sessionStorage.setItem('booking_receipt', JSON.stringify(receipt))
+          }
         }
         toast.success('Booking confirmed!')
-        router.push('/')
+        router.push(`/booking/confirmation/${bookingId}`)
       } else {
         toast.error('Booking created but invalid response')
       }

@@ -2,14 +2,36 @@
 
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Logo from '@/components/Logo'
 import { CheckCircle, Download, Mail, Plane, Calendar } from 'lucide-react'
+
+type ReceiptPassenger = {
+  first_name?: string
+  last_name?: string
+  email?: string
+}
+
+type Receipt = {
+  booking_id?: number
+  booking_reference?: string
+  flight_number?: string
+  departure_airport_code?: string
+  arrival_airport_code?: string
+  departure_time?: string
+  arrival_time?: string
+  cabin_class?: string
+  total_amount?: number
+  passenger_count?: number
+  passengers?: ReceiptPassenger[]
+  issued_at?: string
+}
 
 export default function BookingConfirmationPage() {
   const params = useParams()
   const bookingId = params.id
   const [bookingRef, setBookingRef] = useState<string | null>(null)
+  const [receipt, setReceipt] = useState<Receipt | null>(null)
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -21,30 +43,36 @@ export default function BookingConfirmationPage() {
             setBookingRef(data.bookingRef ?? null)
           }
         }
+        const receiptRaw = sessionStorage.getItem('booking_receipt')
+        if (receiptRaw) {
+          setReceipt(JSON.parse(receiptRaw))
+        }
       } catch {
         // ignore
       }
     }
   }, [bookingId])
 
-  const booking = {
-    confirmationNumber: bookingRef ?? `Booking #${bookingId}`,
-    flight: {
-      airline: 'AEROLINK Airways',
-      flightNumber: 'AL 101',
-      origin: 'New York (JFK)',
-      destination: 'Los Angeles (LAX)',
-      departure: '08:00 AM',
-      arrival: '10:30 AM',
-      date: '2026-02-15',
-    },
-    passenger: {
-      name: 'John Doe',
-      email: 'john@example.com',
-      seat: '12A',
-    },
-    total: 285,
+  const passengerNames = useMemo(() => {
+    if (!receipt?.passengers?.length) return []
+    return receipt.passengers.map((p) => `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim())
+  }, [receipt])
+
+  const formatDateTime = (value?: string) => {
+    if (!value) return ''
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) return value
+    return parsed.toLocaleString()
   }
+
+  const confirmationNumber = bookingRef ?? `Booking #${bookingId}`
+  const flightNumber = receipt?.flight_number ?? '—'
+  const route = receipt?.departure_airport_code && receipt?.arrival_airport_code
+    ? `${receipt.departure_airport_code} → ${receipt.arrival_airport_code}`
+    : '—'
+  const departureTime = formatDateTime(receipt?.departure_time)
+  const arrivalTime = formatDateTime(receipt?.arrival_time)
+  const totalAmount = receipt?.total_amount ?? 0
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -68,7 +96,7 @@ export default function BookingConfirmationPage() {
           {/* Confirmation Number */}
           <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 inline-block">
             <p className="text-sm text-gray-600 mb-1">Confirmation Number</p>
-            <p className="text-2xl font-bold text-primary-800">{booking.confirmationNumber}</p>
+            <p className="text-2xl font-bold text-primary-800">{confirmationNumber}</p>
           </div>
         </div>
 
@@ -90,15 +118,15 @@ export default function BookingConfirmationPage() {
                 <div className="space-y-3">
                   <div>
                     <p className="text-sm text-gray-500">Airline</p>
-                    <p className="font-semibold text-gray-800">{booking.flight.airline}</p>
+                    <p className="font-semibold text-gray-800">AEROLINK Airways</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Flight Number</p>
-                    <p className="font-semibold text-gray-800">{booking.flight.flightNumber}</p>
+                    <p className="font-semibold text-gray-800">{flightNumber}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Seat</p>
-                    <p className="font-semibold text-gray-800">{booking.passenger.seat}</p>
+                    <p className="font-semibold text-gray-800">—</p>
                   </div>
                 </div>
               </div>
@@ -111,15 +139,15 @@ export default function BookingConfirmationPage() {
                 <div className="space-y-3">
                   <div>
                     <p className="text-sm text-gray-500">Date</p>
-                    <p className="font-semibold text-gray-800">{booking.flight.date}</p>
+                    <p className="font-semibold text-gray-800">{departureTime || '—'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Departure</p>
-                    <p className="font-semibold text-gray-800">{booking.flight.departure} - {booking.flight.origin}</p>
+                    <p className="font-semibold text-gray-800">{departureTime || '—'} - {receipt?.departure_airport_code ?? '—'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Arrival</p>
-                    <p className="font-semibold text-gray-800">{booking.flight.arrival} - {booking.flight.destination}</p>
+                    <p className="font-semibold text-gray-800">{arrivalTime || '—'} - {receipt?.arrival_airport_code ?? '—'}</p>
                   </div>
                 </div>
               </div>
@@ -130,12 +158,14 @@ export default function BookingConfirmationPage() {
               <h3 className="font-semibold text-gray-800 mb-4">Passenger Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-gray-500">Name</p>
-                  <p className="font-semibold text-gray-800">{booking.passenger.name}</p>
+                  <p className="text-sm text-gray-500">Passengers</p>
+                  <p className="font-semibold text-gray-800">
+                    {passengerNames.length ? passengerNames.join(', ') : '—'}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Email</p>
-                  <p className="font-semibold text-gray-800">{booking.passenger.email}</p>
+                  <p className="text-sm text-gray-500">Route</p>
+                  <p className="font-semibold text-gray-800">{route}</p>
                 </div>
               </div>
             </div>
@@ -144,7 +174,7 @@ export default function BookingConfirmationPage() {
             <div className="border-t border-gray-200 pt-6 mt-6">
               <div className="flex justify-between items-center">
                 <span className="text-gray-700">Total Paid</span>
-                <span className="text-2xl font-bold text-gray-800">${booking.total}</span>
+                <span className="text-2xl font-bold text-gray-800">${totalAmount}</span>
               </div>
             </div>
           </div>
