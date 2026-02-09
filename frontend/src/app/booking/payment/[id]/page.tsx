@@ -30,6 +30,7 @@ export default function PaymentPage() {
   const [isProcessing, setIsProcessing] = useState(false)
 
   const backToPassengersHref = `/booking/passengers/${flightId}?passengers=${searchParams.get('passengers') || '1'}&cabinClass=${searchParams.get('cabinClass') || 'economy'}`
+  const passengersCount = Math.max(1, parseInt(searchParams.get('passengers') || '1', 10))
 
   const {
     register,
@@ -42,28 +43,28 @@ export default function PaymentPage() {
   // Pricing (total_amount sent to backend; display can be from flight or fixed for now)
   const flightPrice = 250
   const taxes = 35
-  const total = flightPrice + taxes
+  const subtotalPerPassenger = flightPrice + taxes
+  const total = subtotalPerPassenger * passengersCount
 
   const onSubmit = async (data: PaymentFormData) => {
     setIsProcessing(true)
     try {
       const passengerJson = typeof window !== 'undefined' ? sessionStorage.getItem(BOOKING_PASSENGER_KEY) : null
       const passenger = passengerJson ? JSON.parse(passengerJson) : null
-      if (!passenger) {
+      const passengers = Array.isArray(passenger) ? passenger : passenger ? [passenger] : null
+      if (!passengers) {
         toast.error('Passenger details missing. Please go back and enter passenger information.')
         setIsProcessing(false)
         return
       }
-      const passengersPayload = [
-        {
-          first_name: passenger.firstName,
-          last_name: passenger.lastName,
-          email: passenger.email,
-          phone: passenger.phone,
-          date_of_birth: passenger.dateOfBirth,
-          passport_number: passenger.passportNumber || undefined,
-        },
-      ]
+      const passengersPayload = passengers.map((item: any) => ({
+        first_name: item.firstName,
+        last_name: item.lastName,
+        email: item.email,
+        phone: item.phone,
+        date_of_birth: item.dateOfBirth,
+        passport_number: item.passportNumber || undefined,
+      }))
       const res = await api.post('/booking/create', {
         flight_id: parseInt(String(flightId), 10),
         cabin_class: searchParams.get('cabinClass') || 'economy',
@@ -217,12 +218,20 @@ export default function PaymentPage() {
             
             <div className="space-y-3 mb-6">
               <div className="flex justify-between text-gray-700">
+                <span>Passengers</span>
+                <span className="font-semibold">{passengersCount}</span>
+              </div>
+              <div className="flex justify-between text-gray-700">
                 <span>Flight (AEROLINK)</span>
                 <span className="font-semibold">${flightPrice}</span>
               </div>
               <div className="flex justify-between text-gray-700">
                 <span>Taxes & Fees</span>
                 <span className="font-semibold">${taxes}</span>
+              </div>
+              <div className="flex justify-between text-gray-700">
+                <span>Subtotal</span>
+                <span className="font-semibold">${subtotalPerPassenger} x {passengersCount}</span>
               </div>
             </div>
 
