@@ -74,6 +74,9 @@ func (h *Handler) Signin(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(err.Error(), "required") {
 			statusCode = http.StatusBadRequest
 		}
+		if strings.Contains(err.Error(), "email not verified") {
+			statusCode = http.StatusForbidden
+		}
 		log.Printf("Signin error: %v", err)
 		response.Error(w, statusCode, err.Error())
 		return
@@ -107,4 +110,27 @@ func (h *Handler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.Success(w, http.StatusOK, "success", resp)
+}
+
+func (h *Handler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		response.Error(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		response.Error(w, http.StatusBadRequest, "verification token is required")
+		return
+	}
+	resp, err := h.service.VerifyEmail(token)
+	if err != nil {
+		statusCode := http.StatusBadRequest
+		if strings.Contains(err.Error(), "invalid or expired") {
+			statusCode = http.StatusGone
+		}
+		log.Printf("VerifyEmail error: %v", err)
+		response.Error(w, statusCode, err.Error())
+		return
+	}
+	response.Success(w, http.StatusOK, "Email verified successfully", resp)
 }

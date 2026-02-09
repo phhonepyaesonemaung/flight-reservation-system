@@ -11,14 +11,19 @@ import { api } from '@/lib/api'
 import toast from 'react-hot-toast'
 import LogoIcon from '@/components/LogoIcon'
 
+const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
+
 const signUpSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
-  email: z.string().email('Invalid email address'),
-  phone: z.string().min(10, 'Invalid phone number'),
+  email: z
+    .string()
+    .min(1, 'Email is required')
+    .regex(emailRegex, 'Please enter a valid email address'),
+  phone: z.string().min(10, 'Phone must be at least 10 characters'),
   username: z.string().min(3, 'Username must be at least 3 characters'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
-  confirmPassword: z.string(),
+  confirmPassword: z.string().min(1, 'Please confirm your password'),
   agreeToTerms: z.boolean().refine((val) => val === true, {
     message: 'You must agree to the terms and conditions',
   }),
@@ -38,15 +43,23 @@ export default function SignUpPage() {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<SignUpFormData>({
     resolver: zodResolver(signUpSchema),
+    defaultValues: { agreeToTerms: false },
   })
+
+  const agreeToTerms = watch('agreeToTerms')
+  const isSubmitDisabled = isLoading || !agreeToTerms
+
+  const [signupSuccess, setSignupSuccess] = useState(false)
 
   const onSubmit = async (data: SignUpFormData) => {
     setIsLoading(true)
+    setSignupSuccess(false)
     try {
-      await api.post('/auth/signup', {
+      const response = await api.post('/auth/signup', {
         firstName: data.firstName,
         lastName: data.lastName,
         email: data.email,
@@ -54,11 +67,12 @@ export default function SignUpPage() {
         username: data.username,
         password: data.password,
       })
-
-      toast.success('Account created successfully! Please sign in.')
-      router.push('/auth/signin')
+      const payload = response.data?.data ?? response.data
+      const message = payload?.message ?? 'Check your email to verify your account. The link expires in 24 hours.'
+      setSignupSuccess(true)
+      toast.success(message)
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Registration failed')
+      toast.error(error.response?.data?.error ?? error.response?.data?.message ?? 'Registration failed')
     } finally {
       setIsLoading(false)
     }
@@ -103,7 +117,22 @@ export default function SignUpPage() {
               Sign up to start your journey
             </p>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {signupSuccess && (
+              <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-center">
+                <p className="text-green-800 font-medium">Check your email</p>
+                <p className="text-green-700 text-sm mt-1">
+                  We sent a verification link to your email. Click it to verify your account, then sign in.
+                </p>
+                <Link
+                  href="/auth/signin"
+                  className="inline-block mt-3 text-primary-600 hover:text-primary-700 font-semibold text-sm"
+                >
+                  Go to Sign in →
+                </Link>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" style={{ display: signupSuccess ? 'none' : undefined }}>
               {/* Name Fields */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -117,7 +146,7 @@ export default function SignUpPage() {
                       type="text"
                       id="firstName"
                       placeholder="John"
-                      className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200 outline-none bg-white/80"
+                      className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200 outline-none bg-white/80 text-gray-900"
                     />
                   </div>
                   {errors.firstName && (
@@ -136,7 +165,7 @@ export default function SignUpPage() {
                       type="text"
                       id="lastName"
                       placeholder="Doe"
-                      className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200 outline-none bg-white/80"
+                      className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200 outline-none bg-white/80 text-gray-900"
                     />
                   </div>
                   {errors.lastName && (
@@ -158,7 +187,7 @@ export default function SignUpPage() {
                       type="email"
                       id="email"
                       placeholder="john@example.com"
-                      className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200 outline-none bg-white/80"
+                      className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200 outline-none bg-white/80 text-gray-900"
                     />
                   </div>
                   {errors.email && (
@@ -177,7 +206,7 @@ export default function SignUpPage() {
                       type="tel"
                       id="phone"
                       placeholder="+1234567890"
-                      className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200 outline-none bg-white/80"
+                      className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200 outline-none bg-white/80 text-gray-900"
                     />
                   </div>
                   {errors.phone && (
@@ -196,7 +225,7 @@ export default function SignUpPage() {
                   type="text"
                   id="username"
                   placeholder="Choose a username"
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200 outline-none bg-white/80"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200 outline-none bg-white/80 text-gray-900"
                 />
                 {errors.username && (
                   <p className="mt-1 text-sm text-red-600">{errors.username.message}</p>
@@ -215,7 +244,7 @@ export default function SignUpPage() {
                       type={showPassword ? 'text' : 'password'}
                       id="password"
                       placeholder="Enter password"
-                      className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200 outline-none bg-white/80 pr-12"
+                      className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200 outline-none bg-white/80 pr-12 text-gray-900"
                     />
                     <button
                       type="button"
@@ -240,7 +269,7 @@ export default function SignUpPage() {
                       type={showConfirmPassword ? 'text' : 'password'}
                       id="confirmPassword"
                       placeholder="Confirm password"
-                      className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200 outline-none bg-white/80 pr-12"
+                      className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200 outline-none bg-white/80 pr-12 text-gray-900"
                     />
                     <button
                       type="button"
@@ -280,10 +309,10 @@ export default function SignUpPage() {
                 )}
               </div>
 
-              {/* Submit Button */}
+              {/* Submit Button - enabled only when agree to terms is checked */}
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isSubmitDisabled}
                 className="w-full bg-accent hover:bg-accent-hover text-white font-semibold py-3 px-4 rounded-lg transition duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] active:scale-[0.98]"
               >
                 {isLoading ? 'Creating Account...' : 'Create Account'}

@@ -49,6 +49,13 @@
    export PORT=8080
    export JWT_ACCESS_SECRET=your-secret-key-here
    export JWT_REFRESH_SECRET=your-refresh-secret-key-here
+   # Email verification (magic link on signup)
+   export SMTP_HOST=smtp.example.com
+   export SMTP_PORT=587
+   export SMTP_USER=your-smtp-user
+   export SMTP_PASS=your-smtp-password
+   export FROM_EMAIL=noreply@example.com
+   export APP_URL=http://localhost:3000
    ```
 
 4. **Run the application**
@@ -67,3 +74,11 @@ curl -X POST http://localhost:8080/api/data/reset-sequences
 ```
 
 Then creating new records via the API will use the next available IDs.
+
+## 📧 Email verification (signup)
+
+New signups receive a **magic link** by email to verify their account. Until they verify, they cannot sign in.
+
+- Set `SMTP_HOST`, `SMTP_PORT`, `FROM_EMAIL` (and optionally `SMTP_USER`, `SMTP_PASS`) to send mail.
+- `APP_URL` is the frontend base URL used in the verification link (e.g. `http://localhost:3000`).
+- Existing users (before this feature) are treated as already verified so they can still sign in.

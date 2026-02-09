@@ -2,16 +2,33 @@
 
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import Logo from '@/components/Logo'
-import { CheckCircle, Download, Mail, Plane, Calendar, MapPin, Clock } from 'lucide-react'
+import { CheckCircle, Download, Mail, Plane, Calendar } from 'lucide-react'
 
 export default function BookingConfirmationPage() {
   const params = useParams()
-  const flightId = params.id
+  const bookingId = params.id
+  const [bookingRef, setBookingRef] = useState<string | null>(null)
 
-  // Mock booking data
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = sessionStorage.getItem('booking_confirmation')
+        if (raw) {
+          const data = JSON.parse(raw)
+          if (String(data.bookingId) === String(bookingId)) {
+            setBookingRef(data.bookingRef ?? null)
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }, [bookingId])
+
   const booking = {
-    confirmationNumber: 'AL2026-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+    confirmationNumber: bookingRef ?? `Booking #${bookingId}`,
     flight: {
       airline: 'AEROLINK Airways',
       flightNumber: 'AL 101',

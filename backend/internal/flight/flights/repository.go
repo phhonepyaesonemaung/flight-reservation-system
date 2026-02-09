@@ -35,6 +35,9 @@ func (r *Repository) CreateFlight(flightNumber string, departureAirportID, arriv
 	if err := r.insertFlightCabinInventoryTx(tx, flight.ID, aircraftID); err != nil {
 		return nil, err
 	}
+	if err := r.insertFlightSeatsTx(tx, flight.ID, aircraftID); err != nil {
+		return nil, err
+	}
 
 	if err := tx.Commit(); err != nil {
 		return nil, err
@@ -51,24 +54,51 @@ func (r *Repository) insertFlightCabinInventoryTx(tx *sql.Tx, flightID, aircraft
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	var classes []struct {
+		class string
+		count int
+	}
 	for rows.Next() {
-		var class string
-		var count int
-		if err := rows.Scan(&class, &count); err != nil {
+		var c string
+		var n int
+		if err := rows.Scan(&c, &n); err != nil {
+			rows.Close()
 			return err
 		}
+		classes = append(classes, struct {
+			class string
+			count int
+		}{c, n})
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, cc := range classes {
 		_, err := tx.Exec(
 			`INSERT INTO flight_cabin_inventory (flight_id, cabin_class, total_seats, available_seats)
 			 VALUES ($1, $2, $3, $4)
 			 ON CONFLICT (flight_id, cabin_class) DO UPDATE SET total_seats = EXCLUDED.total_seats, available_seats = EXCLUDED.available_seats`,
-			flightID, class, count, count,
+			flightID, cc.class, cc.count, cc.count,
 		)
 		if err != nil {
 			return err
 		}
 	}
-	return rows.Err()
+	return nil
+}
+
+// insertFlightSeatsTx inserts one flight_seats row per seat of the aircraft, all available (is_occupied = false).
+func (r *Repository) insertFlightSeatsTx(tx *sql.Tx, flightID, aircraftID int) error {
+	_, err := tx.Exec(
+		`INSERT INTO flight_seats (flight_id, seat_id, is_occupied)
+		 SELECT $1, id, false FROM seats WHERE aircraft_id = $2
+		 ON CONFLICT (flight_id, seat_id) DO NOTHING`,
+		flightID, aircraftID,
+	)
+	return err
 }
 
 func (r *Repository) GetAllFlights(departureAirportID *int) ([]Flight, error) {

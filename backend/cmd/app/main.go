@@ -2,6 +2,7 @@ package main
 
 import (
 	"aerolink_backend/internal/auth"
+	"aerolink_backend/internal/booking"
 	"aerolink_backend/internal/flight/aircrafts"
 	"aerolink_backend/internal/flight/airports"
 	"aerolink_backend/internal/flight/flights"
@@ -37,10 +38,12 @@ func main() {
 	aircraftHandler := aircrafts.NewHandler(database.DB)
 	flightHandler := flights.NewHandler(database.DB)
 	seatHandler := seats.NewHandler(database.DB)
+	bookingHandler := booking.NewHandler(database.DB)
 
 	http.HandleFunc("/api/auth/signup", authHandler.Signup)
 	http.HandleFunc("/api/auth/signin", authHandler.Signin)
 	http.HandleFunc("/api/auth/refresh", authHandler.RefreshToken)
+	http.HandleFunc("/api/auth/verify-email", authHandler.VerifyEmail)
 
 	// User routes (protected)
 	http.HandleFunc("/api/user/get", middleware.AuthMiddleware(userHandler.GetUser))
@@ -57,6 +60,9 @@ func main() {
 	http.HandleFunc("/api/flight/create-seat", seatHandler.CreateSeat)
 	http.HandleFunc("/api/flight/get-all-seats", seatHandler.GetAllSeats)
 	http.HandleFunc("/api/flight/create-flight-seats", seatHandler.CreateFlightSeats)
+
+	// Booking (protected)
+	http.HandleFunc("/api/booking/create", middleware.AuthMiddleware(bookingHandler.CreateBooking))
 
 	// Health check endpoint
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
