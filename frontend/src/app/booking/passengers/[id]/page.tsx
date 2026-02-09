@@ -15,10 +15,10 @@ const passengerSchema = z.object({
   email: z.string().email('Invalid email'),
   phone: z.string().min(10, 'Invalid phone number'),
   dateOfBirth: z.string().min(1, 'Date of birth is required'),
-    passengerType: z.enum(['local', 'foreign']),
-    nrcNumber: z.string().optional(),
-    passportNumber: z.string().optional(,
-}.refine(
+  passengerType: z.enum(['local', 'foreign']),
+  nrcNumber: z.string().optional(),
+  passportNumber: z.string().optional(),
+}).refine(
   (data) => {
     if (data.passengerType === 'local') {
       return !!data.nrcNumber && data.nrcNumber.trim().length > 0
@@ -45,18 +45,21 @@ export default function PassengerInfoPage() {
   const flightId = params.id as string
   const passengersCount = Math.max(1, parseInt(searchParams.get('passengers') || '1', 10))
   const cabinClass = searchParams.get('cabinClass') || 'economy'
-    const passengerType = (searchParams.get('passengerType') || 'local') as 'local' | 'foreign'
+  const passengerType = (searchParams.get('passengerType') || 'local') as 'local' | 'foreign'
 
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<PassengerFormData>({
     resolver: zodResolver(passengerSchema),
-      defaultValues: {
-    passengerType: passengerType,
-  },
+    defaultValues: {
+      passengerType: passengerType,
+    },
   })
+
+  const selectedPassengerType = watch('passengerType', passengerType)
 
   const onSubmit = (data: PassengerFormData) => {
     if (typeof window !== 'undefined') {
@@ -66,7 +69,7 @@ export default function PassengerInfoPage() {
     const params = new URLSearchParams()
     params.set('passengers', String(passengersCount))
     params.set('cabinClass', cabinClass)
-        params.set('passengerType', passengerType)
+    params.set('passengerType', data.passengerType)
     router.push(`/booking/payment/${flightId}?${params.toString()}`)
   }
 
@@ -172,7 +175,7 @@ export default function PassengerInfoPage() {
               </div>
             </div>
 
-            {/* Birth Date and Passport */}
+            {/* Birth Date and Passenger Type */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -191,8 +194,34 @@ export default function PassengerInfoPage() {
                 )}
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Passenger Type *
+                </label>
+                <div className="flex items-center gap-4">
+                  <label className="inline-flex items-center gap-2">
+                    <input
+                      {...register('passengerType')}
+                      type="radio"
+                      value="local"
+                      className="h-4 w-4 text-primary-600"
+                    />
+                    <span className="text-sm text-gray-700">Local</span>
+                  </label>
+                  <label className="inline-flex items-center gap-2">
+                    <input
+                      {...register('passengerType')}
+                      type="radio"
+                      value="foreign"
+                      className="h-4 w-4 text-primary-600"
+                    />
+                    <span className="text-sm text-gray-700">Foreign</span>
+                  </label>
+                </div>
+              </div>
+
 {/* NRC Number for Local / Passport for Foreign */}
-              {passengerType === 'local' ? (
+              {selectedPassengerType === 'local' ? (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     NRC Number *
