@@ -115,6 +115,7 @@ function SearchResults() {
   const passengers = searchParams.get('passengers')
   const type = searchParams.get('type')
   const cabinClass = searchParams.get('cabinClass') || 'economy'
+    const passengerType = searchParams.get('passengerType') || 'local'
 
   const [data, setData] = useState<SearchFlightsResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -148,7 +149,7 @@ function SearchResults() {
         setData(null)
       })
       .finally(() => setLoading(false))
-  }, [from, to, date, returnDate, type, cabinClass])
+  }, [from, to, date, returnDate, type, cabinClass, passengerType])
 
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated)
   const outbound = data?.outbound ?? []
@@ -163,6 +164,7 @@ function SearchResults() {
     const params = new URLSearchParams()
     if (passengers) params.set('passengers', passengers)
     if (cabinClass) params.set('cabinClass', cabinClass)
+        if (passengerType) params.set('passengerType', passengerType)
     const qs = params.toString()
     const bookingUrl = qs ? `${bookingPath}?${qs}` : bookingPath
     if (isAuthenticated) return bookingUrl
