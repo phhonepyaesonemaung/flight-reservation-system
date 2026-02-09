@@ -20,7 +20,6 @@ const searchSchema = z.object({
   returnDate: z.string().optional(),
   tripType: z.enum(['round', 'oneway']),
   cabinClass: z.enum(['economy', 'business', 'first']),
-    passengerType: z.enum(['local', 'foreign']),
   passengers: z.number().min(1).max(9),
   flexibleDates: z.boolean(),
   refundableOnly: z.boolean(),
@@ -60,7 +59,6 @@ export default function Home() {
       to: 0,
       tripType: 'round',
       cabinClass: 'economy',
-          passengerType: 'local',
       passengers: 1,
       flexibleDates: false,
       refundableOnly: false,
@@ -116,8 +114,7 @@ export default function Home() {
       router.push(
         `/flights/search?from=${data.from}&to=${data.to}&date=${data.departDate}&passengers=${data.passengers}&type=${data.tripType}` +
         (data.tripType === 'round' && data.returnDate ? `&returnDate=${data.returnDate}` : '') +
-        `&cabinClass=${data.cabinClass}` +
-                `&passengerType=${data.passengerType}`
+        `&cabinClass=${data.cabinClass}`
       )
     } catch (e) {
       console.error('Search failed:', e)
@@ -287,20 +284,6 @@ export default function Home() {
                       <option value="oneway">One Way</option>
                     </select>
                   </div>
-
-                                {/* Passenger Type (Local/Foreign) */}
-              <div className="md:col-span-2">
-                <label className="block text-white text-sm font-medium mb-2">
-                  Passenger Type
-                </label>
-                <select
-                  {...register('passengerType')}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none bg-white text-gray-800"
-                >
-                  <option value="local">Local</option>
-                  <option value="foreign">Foreign</option>
-                </select>
-              </div>
 
                   {/* Departure Date */}
                   <div className="md:col-span-2">
