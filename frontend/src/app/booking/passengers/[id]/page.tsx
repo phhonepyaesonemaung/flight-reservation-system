@@ -15,8 +15,24 @@ const passengerSchema = z.object({
   email: z.string().email('Invalid email'),
   phone: z.string().min(10, 'Invalid phone number'),
   dateOfBirth: z.string().min(1, 'Date of birth is required'),
-  passportNumber: z.string().optional(),
-})
+    passengerType: z.enum(['local', 'foreign']),
+    nrcNumber: z.string().optional(),
+    passportNumber: z.string().optional(),
+}.refine(
+  (data) => {
+    if (data.passengerType === 'local') {
+      return !!data.nrcNumber && data.nrcNumber.trim().length > 0
+    }
+    if (data.passengerType === 'foreign') {
+      return !!data.passportNumber && data.passportNumber.trim().length > 0
+    }
+    return true
+  },
+  {
+    message: 'NRC number is required for local passengers, Passport number is required for foreign passengers',
+    path: ['nrcNumber'], // This will be dynamically set
+  }
+)
 
 type PassengerFormData = z.infer<typeof passengerSchema>
 
@@ -29,6 +45,7 @@ export default function PassengerInfoPage() {
   const flightId = params.id as string
   const passengersCount = Math.max(1, parseInt(searchParams.get('passengers') || '1', 10))
   const cabinClass = searchParams.get('cabinClass') || 'economy'
+    const passengerType = (searchParams.get('passengerType') || 'local') as 'local' | 'foreign'
 
   const {
     register,
@@ -36,6 +53,9 @@ export default function PassengerInfoPage() {
     formState: { errors },
   } = useForm<PassengerFormData>({
     resolver: zodResolver(passengerSchema),
+      defaultValues: {
+    passengerType: passengerType,
+  },
   })
 
   const onSubmit = (data: PassengerFormData) => {
@@ -46,6 +66,7 @@ export default function PassengerInfoPage() {
     const params = new URLSearchParams()
     params.set('passengers', String(passengersCount))
     params.set('cabinClass', cabinClass)
+        params.set('passengerType', passengerType)
     router.push(`/booking/payment/${flightId}?${params.toString()}`)
   }
 
@@ -170,17 +191,38 @@ export default function PassengerInfoPage() {
                 )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Passport Number (Optional)
-                </label>
-                <input
-                  {...register('passportNumber')}
-                  type="text"
-                  placeholder="A12345678"
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none bg-white text-gray-800 placeholder-gray-500"
-                />
-              </div>
+{/* NRC Number for Local / Passport for Foreign */}
+              {passengerType === 'local' ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    NRC Number *
+                  </label>
+                  <input
+                    {...register('nrcNumber')}
+                    type="text"
+                    placeholder="12/OUKAMA(N)123456"
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none bg-white text-gray-800 placeholder-gray-500"
+                  />
+                  {errors.nrcNumber && (
+                    <p className="mt-1 text-sm text-red-600">{errors.nrcNumber.message}</p>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Passport Number *
+                  </label>
+                  <input
+                    {...register('passportNumber')}
+                    type="text"
+                    placeholder="A12345678"
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none bg-white text-gray-800 placeholder-gray-500"
+                  />
+                  {errors.passportNumber && (
+                    <p className="mt-1 text-sm text-red-600">{errors.passportNumber.message}</p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Important Notice */}
