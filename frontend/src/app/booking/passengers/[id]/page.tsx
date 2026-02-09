@@ -17,7 +17,7 @@ const passengerSchema = z.object({
   dateOfBirth: z.string().min(1, 'Date of birth is required'),
     passengerType: z.enum(['local', 'foreign']),
     nrcNumber: z.string().optional(),
-    passportNumber: z.string().optional(,
+  passportNumber: z.string().optional()
 }.refine(
   (data) => {
     if (data.passengerType === 'local') {
