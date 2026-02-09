@@ -358,7 +358,7 @@ export default function Home() {
 
                 {/* Search Options */}
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-6">
+                  {/* <div className="flex items-center space-x-6">
                     <label className="flex items-center text-white text-sm">
                       <input
                         {...register('flexibleDates')}
@@ -382,7 +382,7 @@ export default function Home() {
                     >
                       Advance Search {showAdvanced ? '▲' : '▼'}
                     </button>
-                  </div>
+                  </div> */}
 
                   {/* Search Button */}
                   <button
