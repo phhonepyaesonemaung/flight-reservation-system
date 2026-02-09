@@ -116,7 +116,8 @@ export default function Home() {
       router.push(
         `/flights/search?from=${data.from}&to=${data.to}&date=${data.departDate}&passengers=${data.passengers}&type=${data.tripType}` +
         (data.tripType === 'round' && data.returnDate ? `&returnDate=${data.returnDate}` : '') +
-        `&cabinClass=${data.cabinClass}`
+        `&cabinClass=${data.cabinClass}` +
+                `&passengerType=${data.passengerType}`
       )
     } catch (e) {
       console.error('Search failed:', e)
