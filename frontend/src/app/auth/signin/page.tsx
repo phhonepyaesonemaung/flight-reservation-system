@@ -25,6 +25,10 @@ export default function SignInPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirect') || '/'
+  const redirectParam = searchParams.get('redirect')
+  const signupHref = redirectParam
+    ? `/auth/signup?redirect=${encodeURIComponent(redirectParam)}`
+    : '/auth/signup'
   const dispatch = useDispatch()
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -201,7 +205,7 @@ export default function SignInPage() {
               <p className="text-sm text-gray-600">
                 Don't have account?{' '}
                 <Link
-                  href="/auth/signup"
+                  href={signupHref}
                   className="text-primary-600 hover:text-primary-700 font-semibold transition"
                 >
                   Create a new account

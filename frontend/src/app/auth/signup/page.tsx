@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -36,6 +36,11 @@ type SignUpFormData = z.infer<typeof signUpSchema>
 
 export default function SignUpPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectParam = searchParams.get('redirect')
+  const signinHref = redirectParam
+    ? `/auth/signin?redirect=${encodeURIComponent(redirectParam)}`
+    : '/auth/signin'
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -124,7 +129,7 @@ export default function SignUpPage() {
                   We sent a verification link to your email. Click it to verify your account, then sign in.
                 </p>
                 <Link
-                  href="/auth/signin"
+                  href={signinHref}
                   className="inline-block mt-3 text-primary-600 hover:text-primary-700 font-semibold text-sm"
                 >
                   Go to Sign in →
@@ -324,7 +329,7 @@ export default function SignUpPage() {
               <p className="text-sm text-gray-600">
                 Already have an account?{' '}
                 <Link
-                  href="/auth/signin"
+                  href={signinHref}
                   className="text-primary-600 hover:text-primary-700 font-semibold transition"
                 >
                   Sign in
