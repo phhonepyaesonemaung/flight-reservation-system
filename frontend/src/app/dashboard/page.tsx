@@ -2,12 +2,16 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useSelector } from 'react-redux'
+import Link from 'next/link'
+import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '@/store'
+import { logout } from '@/store/slices/authSlice'
 import Logo from '@/components/Logo'
+import toast from 'react-hot-toast'
 
 export default function DashboardPage() {
   const router = useRouter()
+  const dispatch = useDispatch()
   const { isAuthenticated, user } = useSelector((state: RootState) => state.auth)
 
   useEffect(() => {
@@ -15,6 +19,16 @@ export default function DashboardPage() {
       router.push('/auth/signin')
     }
   }, [isAuthenticated, router])
+
+  const handleLogout = () => {
+    dispatch(logout())
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('token')
+      sessionStorage.removeItem('token')
+    }
+    toast.success('Logged out successfully')
+    router.push('/')
+  }
 
   if (!isAuthenticated) {
     return null
@@ -27,11 +41,23 @@ export default function DashboardPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <Logo size="md" />
-            <div className="text-right">
-              <p className="text-sm text-gray-600">Welcome back,</p>
-              <p className="font-semibold text-primary-700">
-                {user?.firstName} {user?.lastName}
-              </p>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-sm text-gray-600">Welcome back,</p>
+                <p className="font-semibold text-primary-700">
+                  {user?.firstName} {user?.lastName}
+                </p>
+              </div>
+              <Link href="/" className="text-gray-600 hover:text-primary-600 transition text-sm font-medium">
+                Home
+              </Link>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="text-gray-600 hover:text-red-600 transition text-sm font-medium"
+              >
+                Logout
+              </button>
             </div>
           </div>
         </div>

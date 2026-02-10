@@ -8,9 +8,11 @@ import { z } from 'zod'
 import { Bell, Search, Calendar, Users } from 'lucide-react'
 import Link from 'next/link'
 import Logo from '@/components/Logo'
-import { useSelector } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '@/store'
+import { logout } from '@/store/slices/authSlice'
 import { api } from '@/lib/api'
+import toast from 'react-hot-toast'
 import type { Airport } from '@/types'
 
 const searchSchema = z.object({
@@ -32,7 +34,18 @@ type SearchFormData = z.infer<typeof searchSchema>
 
 export default function Home() {
   const router = useRouter()
+  const dispatch = useDispatch()
   const { isAuthenticated, user } = useSelector((state: RootState) => state.auth)
+
+  const handleLogout = () => {
+    dispatch(logout())
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('token')
+      sessionStorage.removeItem('token')
+    }
+    toast.success('Logged out successfully')
+    router.push('/')
+  }
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [airports, setAirports] = useState<Airport[]>([])
   const [arrivalAirportIds, setArrivalAirportIds] = useState<Set<number>>(new Set())
@@ -163,6 +176,13 @@ export default function Home() {
                   >
                     Dashboard
                   </Link>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="text-white hover:text-blue-200 transition font-medium"
+                  >
+                    Logout
+                  </button>
                 </div>
               ) : (
                 <div className="flex items-center space-x-3">
