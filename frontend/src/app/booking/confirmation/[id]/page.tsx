@@ -74,6 +74,50 @@ export default function BookingConfirmationPage() {
   const arrivalTime = formatDateTime(receipt?.arrival_time)
   const totalAmount = receipt?.total_amount ?? 0
 
+  const handleDownloadTicket = () => {
+    const html = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Ticket ${confirmationNumber}</title>
+    <style>
+      body { font-family: Arial, sans-serif; color: #111; margin: 32px; }
+      h1 { margin: 0 0 8px; }
+      .subtle { color: #555; font-size: 12px; }
+      .section { margin-top: 20px; padding-top: 12px; border-top: 1px solid #ddd; }
+      .row { margin: 6px 0; }
+      .label { color: #666; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+      .value { font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    <h1>AEROLINK E-Ticket</h1>
+    <div class="subtle">Confirmation: ${confirmationNumber}</div>
+    <div class="section">
+      <div class="row"><div class="label">Flight</div><div class="value">${flightNumber}</div></div>
+      <div class="row"><div class="label">Route</div><div class="value">${route}</div></div>
+      <div class="row"><div class="label">Departure</div><div class="value">${departureTime || '—'}</div></div>
+      <div class="row"><div class="label">Arrival</div><div class="value">${arrivalTime || '—'}</div></div>
+      <div class="row"><div class="label">Cabin Class</div><div class="value">${receipt?.cabin_class ?? '—'}</div></div>
+    </div>
+    <div class="section">
+      <div class="row"><div class="label">Passengers</div><div class="value">${passengerNames.length ? passengerNames.join(', ') : '—'}</div></div>
+      <div class="row"><div class="label">Total Paid</div><div class="value">$${totalAmount}</div></div>
+      <div class="row"><div class="label">Issued At</div><div class="value">${formatDateTime(receipt?.issued_at) || '—'}</div></div>
+    </div>
+    <div class="section subtle">This is a system-generated ticket.</div>
+  </body>
+</html>`
+
+    const printWindow = window.open('', '_blank', 'width=900,height=700')
+    if (!printWindow) return
+    printWindow.document.open()
+    printWindow.document.write(html)
+    printWindow.document.close()
+    printWindow.focus()
+    printWindow.print()
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -182,7 +226,11 @@ export default function BookingConfirmationPage() {
 
         {/* Action Buttons */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <button className="bg-primary-600 hover:bg-primary-700 text-white py-3 rounded-lg font-semibold transition flex items-center justify-center">
+          <button
+            type="button"
+            onClick={handleDownloadTicket}
+            className="bg-primary-600 hover:bg-primary-700 text-white py-3 rounded-lg font-semibold transition flex items-center justify-center"
+          >
             <Download className="w-5 h-5 mr-2" />
             Download Ticket
           </button>
