@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
@@ -37,13 +37,20 @@ type SignUpFormData = z.infer<typeof signUpSchema>
 export default function SignUpPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirectParam = searchParams.get('redirect')
-  const signinHref = redirectParam
-    ? `/auth/signin?redirect=${encodeURIComponent(redirectParam)}`
+  const redirectParam = searchParams.get('redirect')?.trim() || ''
+  const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('post_auth_redirect') : null
+  const signinHref = redirectParam || storedRedirect
+    ? `/auth/signin?redirect=${encodeURIComponent(redirectParam || storedRedirect || '')}`
     : '/auth/signin'
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+
+  useEffect(() => {
+    if (redirectParam) {
+      localStorage.setItem('post_auth_redirect', redirectParam)
+    }
+  }, [redirectParam])
 
   const {
     register,

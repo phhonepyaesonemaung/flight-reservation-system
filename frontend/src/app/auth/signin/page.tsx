@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useDispatch } from 'react-redux'
@@ -24,14 +24,21 @@ type SignInFormData = z.infer<typeof signInSchema>
 export default function SignInPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirectTo = searchParams.get('redirect') || '/'
-  const redirectParam = searchParams.get('redirect')
-  const signupHref = redirectParam
-    ? `/auth/signup?redirect=${encodeURIComponent(redirectParam)}`
+  const redirectParam = searchParams.get('redirect')?.trim() || ''
+  const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('post_auth_redirect') : null
+  const redirectTarget = redirectParam || storedRedirect || '/'
+  const signupHref = redirectParam || storedRedirect
+    ? `/auth/signup?redirect=${encodeURIComponent(redirectParam || storedRedirect || '')}`
     : '/auth/signup'
   const dispatch = useDispatch()
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+
+  useEffect(() => {
+    if (redirectParam) {
+      localStorage.setItem('post_auth_redirect', redirectParam)
+    }
+  }, [redirectParam])
 
   const {
     register,
@@ -74,7 +81,8 @@ export default function SignInPage() {
 
       dispatch(setCredentials({ user, token }))
       toast.success('Welcome back!')
-      router.push(redirectTo)
+      localStorage.removeItem('post_auth_redirect')
+      router.push(redirectTarget)
     } catch (error: any) {
       const msg = error.response?.data?.error ?? error.response?.data?.message ?? 'Invalid credentials'
       toast.error(msg)
