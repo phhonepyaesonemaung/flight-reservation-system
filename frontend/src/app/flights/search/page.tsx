@@ -37,14 +37,23 @@ function FlightCard({
   fromLabel,
   toLabel,
   selectFlightHref,
+  isSelected,
+  onSelect,
 }: {
   flight: SearchFlightRow
   fromLabel: string
   toLabel: string
   selectFlightHref: string
+  isSelected?: boolean
+  onSelect?: () => void
 }) {
+  const useButton = typeof onSelect === 'function'
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition">
+    <div
+      className={`bg-white rounded-lg shadow-md p-6 transition ${
+        isSelected ? 'ring-2 ring-accent ring-offset-2' : 'hover:shadow-lg'
+      }`}
+    >
       <div className="flex items-center justify-between">
         <div className="flex-1">
           <div className="flex items-center space-x-4 mb-4">
@@ -53,6 +62,11 @@ function FlightCard({
               <h3 className="text-lg font-bold text-gray-800">AEROLINK</h3>
               <p className="text-sm text-gray-500">{flight.flight_number}</p>
             </div>
+            {isSelected && (
+              <span className="text-sm font-semibold text-accent bg-accent/10 px-2 py-1 rounded">
+                Selected
+              </span>
+            )}
           </div>
 
           <div className="grid grid-cols-3 gap-8">
@@ -94,12 +108,22 @@ function FlightCard({
             <span className="text-3xl font-bold text-gray-800">{flight.base_price}</span>
           </div>
           <p className="text-sm text-gray-500 mb-4">per person</p>
-          <Link
-            href={selectFlightHref}
-            className="inline-block bg-accent hover:bg-accent-hover text-white px-8 py-3 rounded-lg font-semibold transition shadow-md hover:shadow-lg"
-          >
-            Select Flight
-          </Link>
+          {useButton ? (
+            <button
+              type="button"
+              onClick={onSelect}
+              className="inline-block bg-accent hover:bg-accent-hover text-white px-8 py-3 rounded-lg font-semibold transition shadow-md hover:shadow-lg"
+            >
+              {isSelected ? 'Selected' : 'Select Flight'}
+            </button>
+          ) : (
+            <Link
+              href={selectFlightHref}
+              className="inline-block bg-accent hover:bg-accent-hover text-white px-8 py-3 rounded-lg font-semibold transition shadow-md hover:shadow-lg"
+            >
+              Select Flight
+            </Link>
+          )}
         </div>
       </div>
     </div>
@@ -120,6 +144,14 @@ function SearchResults() {
   const [data, setData] = useState<SearchFlightsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedOutboundId, setSelectedOutboundId] = useState<number | null>(null)
+  const [selectedReturnId, setSelectedReturnId] = useState<number | null>(null)
+  const isRoundTrip = type === 'round'
+
+  useEffect(() => {
+    setSelectedOutboundId(null)
+    setSelectedReturnId(null)
+  }, [from, to, date, returnDate, type])
 
   useEffect(() => {
     const fromId = from ? parseInt(from, 10) : 0
@@ -159,17 +191,37 @@ function SearchResults() {
   const fromLabel = fromCode
   const toLabel = toCode
 
-  const buildSelectFlightHref = (flightId: number) => {
+  const buildSelectFlightHref = (
+    flightId: number,
+    returnId?: number,
+    outboundPrice?: number,
+    returnPrice?: number
+  ) => {
     const bookingPath = `/booking/passengers/${flightId}`
     const params = new URLSearchParams()
     if (passengers) params.set('passengers', passengers)
     if (cabinClass) params.set('cabinClass', cabinClass)
-        if (passengerType) params.set('passengerType', passengerType)
+    if (passengerType) params.set('passengerType', passengerType)
+    if (returnId != null) params.set('returnId', String(returnId))
+    if (outboundPrice != null) params.set('outboundPrice', String(outboundPrice))
+    if (returnPrice != null) params.set('returnPrice', String(returnPrice))
     const qs = params.toString()
     const bookingUrl = qs ? `${bookingPath}?${qs}` : bookingPath
     if (isAuthenticated) return bookingUrl
     return `/auth/signin?redirect=${encodeURIComponent(bookingUrl)}`
   }
+
+  const selectedOutbound = outbound.find((f) => f.id === selectedOutboundId)
+  const selectedReturn = returnFlights.find((f) => f.id === selectedReturnId)
+  const roundTripContinueHref =
+    isRoundTrip && selectedOutboundId != null && selectedReturnId != null && selectedOutbound && selectedReturn
+      ? buildSelectFlightHref(
+          selectedOutboundId,
+          selectedReturnId,
+          selectedOutbound.base_price,
+          selectedReturn.base_price
+        )
+      : null
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -229,6 +281,12 @@ function SearchResults() {
                       fromLabel={fromLabel}
                       toLabel={toLabel}
                       selectFlightHref={buildSelectFlightHref(flight.id)}
+                      isSelected={isRoundTrip ? selectedOutboundId === flight.id : undefined}
+                      onSelect={
+                        isRoundTrip
+                          ? () => setSelectedOutboundId(flight.id)
+                          : undefined
+                      }
                     />
                   ))}
                 </div>
@@ -236,23 +294,48 @@ function SearchResults() {
             </section>
 
             {/* Return (round-trip) */}
-            {type === 'round' && (
-              <section>
+            {isRoundTrip && (
+              <section className="mb-8">
                 <h2 className="text-xl font-bold text-gray-800 mb-4">Return</h2>
                 {returnFlights.length === 0 ? (
                   <p className="text-gray-500">No return flights found for this date.</p>
                 ) : (
-                <div className="space-y-4">
-                  {returnFlights.map((flight) => (
-                    <FlightCard
-                      key={flight.id}
-                      flight={flight}
-                      fromLabel={toLabel}
-                      toLabel={fromLabel}
-                      selectFlightHref={buildSelectFlightHref(flight.id)}
-                    />
-                  ))}
-                </div>
+                  <div className="space-y-4">
+                    {returnFlights.map((flight) => (
+                      <FlightCard
+                        key={flight.id}
+                        flight={flight}
+                        fromLabel={toLabel}
+                        toLabel={fromLabel}
+                        selectFlightHref={buildSelectFlightHref(flight.id)}
+                        isSelected={selectedReturnId === flight.id}
+                        onSelect={() => setSelectedReturnId(flight.id)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* Round trip: continue only when both selected */}
+            {isRoundTrip && (
+              <section className="mt-8 pt-6 border-t border-gray-200">
+                {selectedOutboundId != null && selectedReturnId != null ? (
+                  <div className="flex flex-col items-center gap-4">
+                    <p className="text-gray-600">
+                      You selected outbound and return flights. Continue to passenger details.
+                    </p>
+                    <Link
+                      href={roundTripContinueHref!}
+                      className="inline-block bg-accent hover:bg-accent-hover text-white px-8 py-3 rounded-lg font-semibold transition shadow-md hover:shadow-lg"
+                    >
+                      Continue to passenger details
+                    </Link>
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-center">
+                    Select one outbound and one return flight to continue.
+                  </p>
                 )}
               </section>
             )}

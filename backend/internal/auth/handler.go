@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"net/url"
+	"os"
 	"strings"
 
 	"aerolink_backend/package/response"
@@ -117,19 +119,26 @@ func (h *Handler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
-	token := r.URL.Query().Get("token")
+	token := strings.TrimSpace(r.URL.Query().Get("token"))
 	if token == "" {
 		response.Error(w, http.StatusBadRequest, "verification token is required")
 		return
 	}
+	// If the request looks like a browser (user opened the API link by mistake), redirect to frontend
+	accept := r.Header.Get("Accept")
+	if strings.Contains(accept, "text/html") {
+		appURL := strings.TrimSuffix(os.Getenv("APP_URL"), "/")
+		if appURL == "" {
+			appURL = "http://localhost:3000"
+		}
+		redirectURL := appURL + "/auth/verify-email?token=" + url.QueryEscape(token)
+		http.Redirect(w, r, redirectURL, http.StatusFound)
+		return
+	}
 	resp, err := h.service.VerifyEmail(token)
 	if err != nil {
-		statusCode := http.StatusBadRequest
-		if strings.Contains(err.Error(), "invalid or expired") {
-			statusCode = http.StatusGone
-		}
-		log.Printf("VerifyEmail error: %v", err)
-		response.Error(w, statusCode, err.Error())
+		log.Printf("VerifyEmail error (token len=%d): %v", len(token), err)
+		response.Error(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	response.Success(w, http.StatusOK, "Email verified successfully", resp)

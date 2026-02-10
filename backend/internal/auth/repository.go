@@ -2,6 +2,7 @@ package auth
 
 import (
 	"database/sql"
+	"strings"
 	"time"
 )
 
@@ -131,18 +132,27 @@ func (r *Repository) CreateVerificationToken(userID int, token string, expiresAt
 	return err
 }
 
-// GetUserIDByToken returns the user ID for a valid, non-expired token and deletes the token.
+// GetUserIDByToken returns the user ID for a valid token. Does not delete the token.
 func (r *Repository) GetUserIDByToken(token string) (int, error) {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return 0, sql.ErrNoRows
+	}
 	var userID int
 	err := r.db.QueryRow(
-		`SELECT user_id FROM email_verification_tokens WHERE token = $1 AND expires_at > NOW()`,
+		`SELECT user_id FROM email_verification_tokens WHERE token = $1`,
 		token,
 	).Scan(&userID)
 	if err != nil {
 		return 0, err
 	}
-	_, _ = r.db.Exec(`DELETE FROM email_verification_tokens WHERE token = $1`, token)
 	return userID, nil
+}
+
+// DeleteVerificationToken removes the token so it cannot be used again.
+func (r *Repository) DeleteVerificationToken(token string) error {
+	_, err := r.db.Exec(`DELETE FROM email_verification_tokens WHERE token = $1`, token)
+	return err
 }
 
 // MarkEmailVerified sets email_verified_at for the user.

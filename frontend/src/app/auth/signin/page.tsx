@@ -11,7 +11,6 @@ import { Eye, EyeOff, Plane } from 'lucide-react'
 import { setCredentials } from '@/store/slices/authSlice'
 import { api } from '@/lib/api'
 import toast from 'react-hot-toast'
-import Logo from '@/components/Logo'
 import LogoIcon from '@/components/LogoIcon'
 
 const signInSchema = z.object({

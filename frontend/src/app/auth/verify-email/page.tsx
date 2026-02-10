@@ -9,16 +9,22 @@ import { api } from '@/lib/api'
 import toast from 'react-hot-toast'
 import LogoIcon from '@/components/LogoIcon'
 
+function getTokenFromUrl(): string | null {
+  if (typeof window === 'undefined') return null
+  const params = new URLSearchParams(window.location.search)
+  return params.get('token')?.trim() || null
+}
+
 export default function VerifyEmailPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const token = searchParams.get('token')
   const redirectTo = searchParams.get('redirect') || '/dashboard'
   const dispatch = useDispatch()
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
   const [message, setMessage] = useState('')
 
   useEffect(() => {
+    const token = searchParams.get('token')?.trim() || getTokenFromUrl()
     if (!token) {
       setStatus('error')
       setMessage('Verification link is invalid or missing.')
@@ -27,7 +33,7 @@ export default function VerifyEmailPage() {
 
     let cancelled = false
     api
-      .get(`/auth/verify-email?token=${encodeURIComponent(token)}`)
+      .get(`/auth/verify-email?token=${token}`)
       .then((response) => {
         if (cancelled) return
         const payload = response.data?.data ?? response.data
@@ -61,7 +67,7 @@ export default function VerifyEmailPage() {
       })
 
     return () => { cancelled = true }
-  }, [token, redirectTo, dispatch, router])
+  }, [searchParams, redirectTo, dispatch, router])
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-gradient-to-br from-sky-100 via-blue-50 to-indigo-100">

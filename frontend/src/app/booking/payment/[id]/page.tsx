@@ -29,8 +29,19 @@ export default function PaymentPage() {
   const flightId = params.id
   const [isProcessing, setIsProcessing] = useState(false)
 
-  const backToPassengersHref = `/booking/passengers/${flightId}?passengers=${searchParams.get('passengers') || '1'}&cabinClass=${searchParams.get('cabinClass') || 'economy'}`
   const passengersCount = Math.max(1, parseInt(searchParams.get('passengers') || '1', 10))
+  const returnId = searchParams.get('returnId')
+  const outboundPrice = Number(searchParams.get('outboundPrice')) || 250
+  const returnPrice = returnId ? (Number(searchParams.get('returnPrice')) || 0) : 0
+  const isRoundTrip = !!returnId
+
+  const backToPassengersParams = new URLSearchParams()
+  backToPassengersParams.set('passengers', searchParams.get('passengers') || '1')
+  backToPassengersParams.set('cabinClass', searchParams.get('cabinClass') || 'economy')
+  if (returnId) backToPassengersParams.set('returnId', returnId)
+  if (searchParams.get('outboundPrice')) backToPassengersParams.set('outboundPrice', searchParams.get('outboundPrice')!)
+  if (searchParams.get('returnPrice')) backToPassengersParams.set('returnPrice', searchParams.get('returnPrice')!)
+  const backToPassengersHref = `/booking/passengers/${flightId}?${backToPassengersParams.toString()}`
 
   const {
     register,
@@ -40,10 +51,10 @@ export default function PaymentPage() {
     resolver: zodResolver(paymentSchema),
   })
 
-  // Pricing (total_amount sent to backend; display can be from flight or fixed for now)
-  const flightPrice = 250
+  // Pricing: one-way = outbound only; round-trip = outbound + return
+  const flightPricePerPassenger = outboundPrice + returnPrice
   const taxes = 35
-  const subtotalPerPassenger = flightPrice + taxes
+  const subtotalPerPassenger = flightPricePerPassenger + taxes
   const total = subtotalPerPassenger * passengersCount
 
   const onSubmit = async (data: PaymentFormData) => {
@@ -225,10 +236,27 @@ export default function PaymentPage() {
                 <span>Passengers</span>
                 <span className="font-semibold">{passengersCount}</span>
               </div>
-              <div className="flex justify-between text-gray-700">
-                <span>Flight (AEROLINK)</span>
-                <span className="font-semibold">${flightPrice}</span>
-              </div>
+              {isRoundTrip ? (
+                <>
+                  <div className="flex justify-between text-gray-700">
+                    <span>Outbound flight (AEROLINK)</span>
+                    <span className="font-semibold">${outboundPrice}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-700">
+                    <span>Return flight (AEROLINK)</span>
+                    <span className="font-semibold">${returnPrice}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-700">
+                    <span>Flights total</span>
+                    <span className="font-semibold">${flightPricePerPassenger}</span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex justify-between text-gray-700">
+                  <span>Flight (AEROLINK)</span>
+                  <span className="font-semibold">${flightPricePerPassenger}</span>
+                </div>
+              )}
               <div className="flex justify-between text-gray-700">
                 <span>Taxes & Fees</span>
                 <span className="font-semibold">${taxes}</span>

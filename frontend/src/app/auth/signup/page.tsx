@@ -14,8 +14,8 @@ import LogoIcon from '@/components/LogoIcon'
 const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
 
 const signUpSchema = z.object({
-  firstName: z.string().min(1, 'First name is required'),
-  lastName: z.string().min(1, 'Last name is required'),
+  first_name: z.string().min(1, 'First name is required'),
+  last_name: z.string().min(1, 'Last name is required'),
   email: z
     .string()
     .min(1, 'Email is required')
@@ -60,8 +60,8 @@ export default function SignUpPage() {
     setSignupSuccess(false)
     try {
       const response = await api.post('/auth/signup', {
-        firstName: data.firstName,
-        lastName: data.lastName,
+        first_name: data.first_name,
+        last_name: data.last_name,
         email: data.email,
         phone: data.phone,
         username: data.username,
@@ -136,40 +136,40 @@ export default function SignUpPage() {
               {/* Name Fields */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="first_name" className="block text-sm font-medium text-gray-700 mb-2">
                     First Name
                   </label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <input
-                      {...register('firstName')}
+                      {...register('first_name')}
                       type="text"
-                      id="firstName"
+                      id="first_name"
                       placeholder="John"
                       className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200 outline-none bg-white/80 text-gray-900"
                     />
                   </div>
-                  {errors.firstName && (
-                    <p className="mt-1 text-sm text-red-600">{errors.firstName.message}</p>
+                  {errors.first_name && (
+                    <p className="mt-1 text-sm text-red-600">{errors.first_name.message}</p>
                   )}
                 </div>
 
                 <div>
-                  <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="last_name" className="block text-sm font-medium text-gray-700 mb-2">
                     Last Name
                   </label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <input
-                      {...register('lastName')}
+                      {...register('last_name')}
                       type="text"
-                      id="lastName"
+                      id="last_name"
                       placeholder="Doe"
                       className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200 outline-none bg-white/80 text-gray-900"
                     />
                   </div>
-                  {errors.lastName && (
-                    <p className="mt-1 text-sm text-red-600">{errors.lastName.message}</p>
+                  {errors.last_name && (
+                    <p className="mt-1 text-sm text-red-600">{errors.last_name.message}</p>
                   )}
                 </div>
               </div>

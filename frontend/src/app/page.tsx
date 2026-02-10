@@ -118,11 +118,8 @@ export default function Home() {
         returnDate: data.tripType === 'round' ? data.returnDate : undefined,
         cabinClass: data.cabinClass,
       }
-      console.log("Body = ", body)
       const res: any = await api.post('/flight/search', body)
-      console.log("Res = ", res)
       const payload = res?.data?.data ?? res?.data
-      console.log('Search results:', payload)
       // Optional: still navigate with query params for later use
       router.push(
         `/flights/search?from=${data.from}&to=${data.to}&date=${data.departDate}&passengers=${data.passengers}&type=${data.tripType}` +

@@ -86,6 +86,12 @@ export default function PassengerInfoPage() {
     const params = new URLSearchParams()
     params.set('passengers', String(passengersCount))
     params.set('cabinClass', cabinClass)
+    const returnId = searchParams.get('returnId')
+    const outboundPrice = searchParams.get('outboundPrice')
+    const returnPrice = searchParams.get('returnPrice')
+    if (returnId) params.set('returnId', returnId)
+    if (outboundPrice) params.set('outboundPrice', outboundPrice)
+    if (returnPrice) params.set('returnPrice', returnPrice)
     router.push(`/booking/payment/${flightId}?${params.toString()}`)
   }
 

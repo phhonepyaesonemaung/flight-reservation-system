@@ -189,13 +189,14 @@ func (s *Service) RefreshToken(req *RefreshTokenRequest) (*AuthResponse, error) 
 }
 
 // VerifyEmail consumes the token, marks the user as verified, and returns auth tokens so the user can be signed in.
+// The token is only deleted after full success so duplicate requests (e.g. React double-mount) don't cause "already used".
 func (s *Service) VerifyEmail(token string) (*AuthResponse, error) {
 	if strings.TrimSpace(token) == "" {
 		return nil, errors.New("verification token is required")
 	}
 	userID, err := s.repo.GetUserIDByToken(token)
 	if err != nil {
-		return nil, errors.New("invalid or expired verification link")
+		return nil, errors.New("this verification link is invalid or has already been used; try signing in with your username and password")
 	}
 	if err := s.repo.MarkEmailVerified(userID); err != nil {
 		return nil, errors.New("failed to verify email")
@@ -212,6 +213,7 @@ func (s *Service) VerifyEmail(token string) (*AuthResponse, error) {
 	if err != nil {
 		return nil, errors.New("failed to generate refresh token")
 	}
+	_ = s.repo.DeleteVerificationToken(token)
 	return &AuthResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
