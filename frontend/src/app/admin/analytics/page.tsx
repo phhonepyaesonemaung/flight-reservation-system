@@ -1,11 +1,10 @@
 'use client'
 
-import AdminLayout from '@/components/AdminLayout'
 import { TrendingUp, DollarSign, Users, Plane } from 'lucide-react'
 
 export default function AdminAnalyticsPage() {
   return (
-    <AdminLayout>
+    <>
       <h1 className="text-3xl font-bold text-gray-800 mb-6">Analytics & Reports</h1>
 
       {/* Revenue Chart */}
@@ -59,6 +58,6 @@ export default function AdminAnalyticsPage() {
           ))}
         </div>
       </div>
-    </AdminLayout>
+    </>
   )
 }

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import AdminLayout from '@/components/AdminLayout'
 import { Search, Download, Eye } from 'lucide-react'
 
 export default function AdminBookingsPage() {
@@ -48,7 +47,7 @@ export default function AdminBookingsPage() {
   ]
 
   return (
-    <AdminLayout>
+    <>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Booking Management</h1>
         <button className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center">
@@ -144,6 +143,6 @@ export default function AdminBookingsPage() {
           </table>
         </div>
       </div>
-    </AdminLayout>
+    </>
   )
 }

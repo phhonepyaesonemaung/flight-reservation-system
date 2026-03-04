@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import AdminLayout from '@/components/AdminLayout'
 import { Plus, Edit, Trash2, Search } from 'lucide-react'
 
 export default function AdminAirportsPage() {
@@ -42,7 +41,7 @@ export default function AdminAirportsPage() {
   ]
 
   return (
-    <AdminLayout>
+    <>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Airport Management</h1>
         <button className="bg-accent hover:bg-accent-hover text-white px-6 py-3 rounded-lg font-semibold transition flex items-center">
@@ -117,6 +116,6 @@ export default function AdminAirportsPage() {
           </table>
         </div>
       </div>
-    </AdminLayout>
+    </>
   )
 }

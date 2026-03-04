@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import AdminLayout from '@/components/AdminLayout'
 import { Plus, Edit, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -29,7 +28,7 @@ export default function AdminAirlinesPage() {
   ]
 
   return (
-    <AdminLayout>
+    <>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Airline Management</h1>
         <button className="bg-accent hover:bg-accent-hover text-white px-6 py-3 rounded-lg font-semibold transition flex items-center">
@@ -76,6 +75,6 @@ export default function AdminAirlinesPage() {
           </div>
         ))}
       </div>
-    </AdminLayout>
+    </>
   )
 }
