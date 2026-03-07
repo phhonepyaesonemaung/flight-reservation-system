@@ -219,27 +219,29 @@ export default function AdminFlightsPage() {
       .finally(() => setSubmitting(false))
   }
 
-  const handleDelete = (id: number) => {
-    toast.success('Flight deleted successfully')
+  const handleDelete = (_id: number) => {
+    // No binding yet
   }
 
   return (
     <AdminLayout>
+      <>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Flight Management</h1>
+        <h1 className="text-3xl font-bold text-gray-800">Manage Flights</h1>
         <button
+          type="button"
           onClick={() => setShowAddModal(true)}
-          className="bg-accent hover:bg-accent-hover text-white px-6 py-3 rounded-lg font-semibold transition flex items-center"
+          className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2"
         >
-          <Plus className="w-5 h-5 mr-2" />
+          <Plus className="w-5 h-5" />
           Add Flight
         </button>
       </div>
 
       {/* Search */}
       <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-        <div className="flex items-center space-x-4">
-          <div className="flex-1 relative">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex-1 min-w-[200px] relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
@@ -252,7 +254,7 @@ export default function AdminFlightsPage() {
         </div>
       </div>
 
-      {/* Flights Table */}
+      {/* Table – columns match backend flights table */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-gray-500">Loading flights...</div>
@@ -607,6 +609,7 @@ export default function AdminFlightsPage() {
           </div>
         </div>
       )}
+      </>
     </AdminLayout>
   )
 }

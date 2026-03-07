@@ -18,7 +18,12 @@ function getTokenFromUrl(): string | null {
 export default function VerifyEmailPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirectTo = searchParams.get('redirect') || '/dashboard'
+  const redirectParam = searchParams.get('redirect')?.trim() || ''
+  const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('post_auth_redirect') : null
+  const redirectTarget = redirectParam || storedRedirect || '/dashboard'
+  const signinHref = redirectParam || storedRedirect
+    ? `/auth/signin?redirect=${encodeURIComponent(redirectParam || storedRedirect || '')}`
+    : '/auth/signin'
   const dispatch = useDispatch()
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
   const [message, setMessage] = useState('')
@@ -52,7 +57,8 @@ export default function VerifyEmailPage() {
           dispatch(setCredentials({ user: normalizedUser, token: accessToken }))
           setStatus('success')
           toast.success('Email verified! You are now signed in.')
-          router.push(redirectTo)
+          localStorage.removeItem('post_auth_redirect')
+          router.push(redirectTarget)
         } else {
           setStatus('error')
           setMessage('Could not complete verification.')
@@ -67,7 +73,7 @@ export default function VerifyEmailPage() {
       })
 
     return () => { cancelled = true }
-  }, [searchParams, redirectTo, dispatch, router])
+  }, [searchParams, redirectTarget, dispatch, router])
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-gradient-to-br from-sky-100 via-blue-50 to-indigo-100">
@@ -88,7 +94,7 @@ export default function VerifyEmailPage() {
         <div className="text-center max-w-md">
           <p className="text-red-600 mb-4">{message}</p>
           <Link
-            href="/auth/signin"
+            href={signinHref}
             className="inline-block bg-accent hover:bg-accent-hover text-white px-6 py-2 rounded-lg font-semibold"
           >
             Go to Sign in

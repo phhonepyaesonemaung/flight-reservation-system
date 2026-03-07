@@ -118,6 +118,13 @@ func (s *Service) CreateBooking(userID int, req *CreateBookingRequest) (*CreateB
 	}, nil
 }
 
+// GenerateTicketPDF is a placeholder implementation used by the DownloadTicket handler.
+// It currently does not generate a real PDF and simply returns an error to the caller.
+// This keeps the handler compiling while making it clear that the feature is not yet implemented.
+func (s *Service) GenerateTicketPDF(userID, bookingID int) ([]byte, string, error) {
+	return nil, "", errors.New("ticket PDF generation is not implemented yet")
+}
+
 func extractPassengerNames(passengers []ReceiptPassenger) []string {
 	items := make([]string, 0, len(passengers))
 	for _, p := range passengers {

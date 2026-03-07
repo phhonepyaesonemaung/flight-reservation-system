@@ -35,9 +35,9 @@ services:
       APP_URL: http://localhost:3000
       SMTP_HOST: smtp.gmail.com
       SMTP_PORT: 587
-      SMTP_USER: inexsolutions.mm@gmail.com
-      SMTP_PASS: pfht mzmp effx iset
-      FROM_EMAIL: inexsolutions.mm@gmail.com
+      SMTP_USER: aerolinkdesk@gmail.com
+      SMTP_PASS: uhhv dhtt pfam hfkg
+      FROM_EMAIL: aerolinkdesk@gmail.com
     ports:
       - "8080:8080"
     depends_on:

@@ -45,7 +45,7 @@ export default function AdminBookingsPage() {
   })
 
   return (
-    <AdminLayout>
+    <>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Bookings</h1>
       </div>
@@ -129,6 +129,6 @@ export default function AdminBookingsPage() {
           </div>
         )}
       </div>
-    </AdminLayout>
+    </>
   )
 }

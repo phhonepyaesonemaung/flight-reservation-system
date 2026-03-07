@@ -74,7 +74,7 @@ export default function AdminAirportsPage() {
   }
 
   return (
-    <AdminLayout>
+    <>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Airports</h1>
         <button
@@ -139,6 +139,7 @@ export default function AdminAirportsPage() {
           </div>
         )}
       </div>
+<<<<<<< HEAD
 
       {showAdd && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
@@ -216,5 +217,8 @@ export default function AdminAirportsPage() {
         </div>
       )}
     </AdminLayout>
+=======
+    </>
+>>>>>>> 01c6c524e6701ce1327aebf3959baf746bb3c4e2
   )
 }
