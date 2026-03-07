@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"strings"
 
@@ -59,4 +60,23 @@ func GetUserID(r *http.Request) int {
 		return 0
 	}
 	return userID
+}
+
+// AdminMiddleware validates JWT and ensures the user is an admin (exists in admin_users).
+// Use for admin-only routes. Pass the database connection.
+func AdminMiddleware(db *sql.DB, next http.HandlerFunc) http.HandlerFunc {
+	return AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		userID := GetUserID(r)
+		if userID == 0 {
+			response.Error(w, http.StatusUnauthorized, "Unauthorized")
+			return
+		}
+		var id int
+		err := db.QueryRow("SELECT id FROM admin_users WHERE id = $1", userID).Scan(&id)
+		if err != nil || id == 0 {
+			response.Error(w, http.StatusForbidden, "Admin access required")
+			return
+		}
+		next(w, r)
+	})
 }

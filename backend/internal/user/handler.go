@@ -45,3 +45,17 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 
 	response.Success(w, http.StatusOK, "success", user)
 }
+
+func (h *Handler) ListAllUsers(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		response.Error(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	list, err := h.service.GetAllUsersWithBookingCount()
+	if err != nil {
+		log.Printf("ListAllUsers error: %v", err)
+		response.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	response.Success(w, http.StatusOK, "success", list)
+}

@@ -2,9 +2,12 @@
 
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useRef, useEffect, useMemo, useState } from 'react'
 import Logo from '@/components/Logo'
 import { CheckCircle, Download, Mail, Plane, Calendar } from 'lucide-react'
+import html2canvas from 'html2canvas'
+import { jsPDF } from 'jspdf'
+import { api } from '@/lib/api'
 
 type ReceiptPassenger = {
   first_name?: string
@@ -30,8 +33,10 @@ type Receipt = {
 export default function BookingConfirmationPage() {
   const params = useParams()
   const bookingId = params.id
+  const ticketRef = useRef<HTMLDivElement>(null)
   const [bookingRef, setBookingRef] = useState<string | null>(null)
   const [receipt, setReceipt] = useState<Receipt | null>(null)
+  const [downloading, setDownloading] = useState(false)
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -53,6 +58,21 @@ export default function BookingConfirmationPage() {
     }
   }, [bookingId])
 
+  // If no receipt in session (e.g. came from My Bookings or check-in), fetch from API
+  useEffect(() => {
+    if (!bookingId || receipt !== null) return
+    api
+      .get('/booking/receipt', { params: { id: bookingId } })
+      .then((res) => {
+        const data = res.data?.data ?? res.data
+        if (data) {
+          setReceipt(data)
+          if (data.booking_reference) setBookingRef(data.booking_reference)
+        }
+      })
+      .catch(() => {})
+  }, [bookingId, receipt])
+
   const passengerNames = useMemo(() => {
     if (!receipt?.passengers?.length) return []
     return receipt.passengers.map((p) => `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim())
@@ -73,6 +93,37 @@ export default function BookingConfirmationPage() {
   const departureTime = formatDateTime(receipt?.departure_time)
   const arrivalTime = formatDateTime(receipt?.arrival_time)
   const totalAmount = receipt?.total_amount ?? 0
+
+  const handleDownloadTicket = async () => {
+    const el = ticketRef.current
+    if (!el) return
+    setDownloading(true)
+    try {
+      const canvas = await html2canvas(el, { scale: 2, useCORS: true })
+      const imgData = canvas.toDataURL('image/png')
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      const pdfW = pdf.internal.pageSize.getWidth()
+      const pdfH = pdf.internal.pageSize.getHeight()
+      const imgW = canvas.width
+      const imgH = canvas.height
+      const pxToMm = 25.4 / 96
+      let w = imgW * pxToMm
+      let h = imgH * pxToMm
+      const margin = 10
+      if (w > pdfW - 2 * margin || h > pdfH - 2 * margin) {
+        const scale = Math.min((pdfW - 2 * margin) / w, (pdfH - 2 * margin) / h)
+        w *= scale
+        h *= scale
+      }
+      pdf.addImage(imgData, 'PNG', (pdfW - w) / 2, margin, w, h)
+      const filename = `AEROLINK-Ticket-${(bookingRef ?? bookingId) ?? 'ticket'}.pdf`.replace(/\s/g, '-')
+      pdf.save(filename)
+    } catch (err) {
+      console.error('PDF download failed:', err)
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -101,7 +152,7 @@ export default function BookingConfirmationPage() {
         </div>
 
         {/* E-Ticket */}
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden mb-6">
+        <div ref={ticketRef} className="bg-white rounded-lg shadow-lg overflow-hidden mb-6">
           <div className="bg-primary-800 text-white p-6">
             <h2 className="text-2xl font-bold mb-2">E-Ticket</h2>
             <p className="text-blue-200">Please save or print this ticket for your records</p>
@@ -182,9 +233,14 @@ export default function BookingConfirmationPage() {
 
         {/* Action Buttons */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <button className="bg-primary-600 hover:bg-primary-700 text-white py-3 rounded-lg font-semibold transition flex items-center justify-center">
+          <button
+            type="button"
+            onClick={handleDownloadTicket}
+            disabled={downloading}
+            className="bg-primary-600 hover:bg-primary-700 disabled:opacity-70 text-white py-3 rounded-lg font-semibold transition flex items-center justify-center"
+          >
             <Download className="w-5 h-5 mr-2" />
-            Download Ticket
+            {downloading ? 'Generating PDF...' : 'Download Ticket'}
           </button>
           <button className="bg-gray-600 hover:bg-gray-700 text-white py-3 rounded-lg font-semibold transition flex items-center justify-center">
             <Mail className="w-5 h-5 mr-2" />

@@ -34,6 +34,10 @@ func InitDB(host, port, user, password, dbname string) error {
 	if err := ensureEmailVerificationSchema(); err != nil {
 		return fmt.Errorf("failed to ensure email verification schema: %w", err)
 	}
+	// Create admin_users table if it doesn't exist
+	if err := createAdminUsersTable(); err != nil {
+		return fmt.Errorf("failed to create admin_users table: %w", err)
+	}
 
 	// Create flight tables if it doesn't exist
 	if err := createFlightTables(); err != nil {
@@ -43,6 +47,15 @@ func InitDB(host, port, user, password, dbname string) error {
 	// Create booking tables if it doesn't exist
 	if err := createBookingTables(); err != nil {
 		return fmt.Errorf("failed to create booking tables: %w", err)
+	}
+	if err := ensureCheckInSchema(); err != nil {
+		return fmt.Errorf("failed to ensure check-in schema: %w", err)
+	}
+	if err := createProgramTables(); err != nil {
+		return fmt.Errorf("failed to create program tables: %w", err)
+	}
+	if err := seedProgramTiers(); err != nil {
+		return fmt.Errorf("failed to seed program tiers: %w", err)
 	}
 
 	return nil
@@ -97,6 +110,25 @@ func ensureEmailVerificationSchema() error {
 		return err
 	}
 	log.Println("Email verification schema ready")
+	return nil
+}
+
+func createAdminUsersTable() error {
+	query := `
+	CREATE TABLE IF NOT EXISTS admin_users (
+		id SERIAL PRIMARY KEY,
+		username VARCHAR(100) UNIQUE NOT NULL,
+		password_hash VARCHAR(255) NOT NULL,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_admin_users_username ON admin_users(username);
+	`
+	_, err := DB.Exec(query)
+	if err != nil {
+		return err
+	}
+	log.Println("Admin users table initialized successfully")
 	return nil
 }
 
@@ -251,6 +283,8 @@ func createBookingTables() error {
 
     total_amount NUMERIC(10,2) NOT NULL,
 
+    checked_in_at TIMESTAMP NULL,
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -296,6 +330,68 @@ func createBookingTables() error {
 	return nil
 }
 
+func ensureCheckInSchema() error {
+	_, _ = DB.Exec(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMP NULL`)
+	return nil
+}
+
+func createProgramTables() error {
+	query := `
+	-- Program tiers (Silver, Gold, Diamond)
+	CREATE TABLE IF NOT EXISTS program_tiers (
+		id SERIAL PRIMARY KEY,
+		name VARCHAR(20) UNIQUE NOT NULL,
+		display_name VARCHAR(50) NOT NULL,
+		discount_percent INT NOT NULL CHECK (discount_percent >= 0 AND discount_percent <= 100),
+		duration_months INT NOT NULL,
+		price NUMERIC(10,2) NOT NULL,
+		benefits_text TEXT,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_program_tiers_name ON program_tiers(name);
+
+	-- User program purchases (active membership = most recent purchase where expires_at > now())
+	CREATE TABLE IF NOT EXISTS user_program_purchases (
+		id SERIAL PRIMARY KEY,
+		user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		tier_id INT NOT NULL REFERENCES program_tiers(id) ON DELETE RESTRICT,
+		purchased_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		expires_at TIMESTAMP NOT NULL,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_user_program_purchases_user ON user_program_purchases(user_id);
+	CREATE INDEX IF NOT EXISTS idx_user_program_purchases_expires ON user_program_purchases(user_id, expires_at);
+	`
+	_, err := DB.Exec(query)
+	if err != nil {
+		return err
+	}
+	log.Println("Program tables initialized successfully")
+	return nil
+}
+
+func seedProgramTiers() error {
+	_, err := DB.Exec(`
+		INSERT INTO program_tiers (name, display_name, discount_percent, duration_months, price, benefits_text, updated_at)
+		VALUES
+			('silver', 'Silver', 5, 5, 49.99, '5% off all flights • Priority boarding • Extra baggage allowance • Dedicated customer support • Member-only promotions', NOW()),
+			('gold', 'Gold', 10, 10, 99.99, '10% off all flights • Lounge access • Free seat selection • Priority check-in • Bonus miles • Exclusive Gold promotions', NOW()),
+			('diamond', 'Diamond', 20, 24, 199.99, '20% off all flights for 2 years • First-class upgrade eligibility • Concierge service • Highest priority boarding • Complimentary lounge • Diamond-only offers', NOW())
+		ON CONFLICT (name) DO UPDATE SET
+			display_name = EXCLUDED.display_name,
+			discount_percent = EXCLUDED.discount_percent,
+			duration_months = EXCLUDED.duration_months,
+			price = EXCLUDED.price,
+			benefits_text = EXCLUDED.benefits_text,
+			updated_at = EXCLUDED.updated_at
+	`)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // ResetSequences sets all SERIAL sequences to the current MAX(id) for each table.
 // Call this after importing data with explicit IDs so the next INSERT gets a new id.
 // Without this, imported rows (e.g. id=1,2,3) leave the sequence at 1 and the next
@@ -305,6 +401,7 @@ func ResetSequences() error {
 		"users", "airports", "aircraft", "flights", "seats",
 		"flight_seats", "flight_cabin_inventory", "bookings",
 		"booking_passengers", "email_verification_tokens",
+		"program_tiers", "user_program_purchases",
 	}
 	for _, table := range tables {
 		// setval(seq, max_id) so next nextval() returns max_id+1

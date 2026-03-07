@@ -8,6 +8,17 @@ import { z } from 'zod'
 import Logo from '@/components/Logo'
 import { ArrowLeft, User, Mail, Phone, Calendar } from 'lucide-react'
 import toast from 'react-hot-toast'
+import NRC_DATA from '@/constants/nrc_data'
+
+/** Builds NRC string for backend: e.g. 12/PAZATA(N)037180 */
+function buildNrcNumber(state: string, township: string, type: string, numberPart: string): string {
+  if (!state || !township || !type || !numberPart?.trim()) return ''
+  const townshipCode = township.replace(/\s/g, '').toUpperCase()
+  const typeCode = type.toUpperCase()
+  const num = numberPart.trim().replace(/\D/g, '') // digits only
+  const padded = num.length <= 6 ? num.padStart(6, '0') : num
+  return `${state}/${townshipCode}(${typeCode})${padded}`
+}
 
 const passengerSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -17,11 +28,16 @@ const passengerSchema = z.object({
   dateOfBirth: z.string().min(1, 'Date of birth is required'),
   passengerType: z.enum(['local', 'foreign']),
   nrcNumber: z.string().optional(),
+  nrcState: z.string().optional(),
+  nrcTownship: z.string().optional(),
+  nrcType: z.string().optional(),
+  nrcNumberPart: z.string().optional(),
   passportNumber: z.string().optional(),
 }).refine(
   (data) => {
     if (data.passengerType === 'local') {
-      return !!data.nrcNumber && data.nrcNumber.trim().length > 0
+      const nrc = data.nrcNumber?.trim() || buildNrcNumber(data.nrcState || '', data.nrcTownship || '', data.nrcType || '', data.nrcNumberPart || '')
+      return !!nrc && nrc.length > 0
     }
     if (data.passengerType === 'foreign') {
       return !!data.passportNumber && data.passportNumber.trim().length > 0
@@ -29,8 +45,8 @@ const passengerSchema = z.object({
     return true
   },
   {
-    message: 'NRC number is required for local passengers, Passport number is required for foreign passengers',
-    path: ['nrcNumber'], // This will be dynamically set
+    message: 'NRC number is required for local passengers. Select state, township, type and enter number.',
+    path: ['nrcNumber'],
   }
 )
 
@@ -56,6 +72,7 @@ export default function PassengerInfoPage() {
     handleSubmit,
     watch,
     control,
+    setValue,
     formState: { errors },
   } = useForm<PassengerFormData>({
     resolver: zodResolver(passengersFormSchema),
@@ -68,6 +85,10 @@ export default function PassengerInfoPage() {
         dateOfBirth: '',
         passengerType: passengerType,
         nrcNumber: '',
+        nrcState: '',
+        nrcTownship: '',
+        nrcType: '',
+        nrcNumberPart: '',
         passportNumber: '',
       })),
     },
@@ -80,7 +101,14 @@ export default function PassengerInfoPage() {
 
   const onSubmit = (data: PassengerFormData) => {
     if (typeof window !== 'undefined') {
-      sessionStorage.setItem(BOOKING_PASSENGER_KEY, JSON.stringify(data.passengers))
+      const passengersToStore = data.passengers.map((p) => {
+        const nrcNumber = p.passengerType === 'local'
+          ? (p.nrcNumber?.trim() || buildNrcNumber(p.nrcState || '', p.nrcTownship || '', p.nrcType || '', p.nrcNumberPart || ''))
+          : ''
+        const { nrcState, nrcTownship, nrcType, nrcNumberPart, ...rest } = p
+        return { ...rest, nrcNumber }
+      })
+      sessionStorage.setItem(BOOKING_PASSENGER_KEY, JSON.stringify(passengersToStore))
     }
     toast.success('Passenger information saved')
     const params = new URLSearchParams()
@@ -268,16 +296,93 @@ export default function PassengerInfoPage() {
 
                     {/* NRC Number for Local / Passport for Foreign */}
                     {selectedPassengerType === 'local' ? (
-                      <div>
+                      <div className="space-y-3">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           NRC Number *
                         </label>
-                        <input
-                          {...register(`passengers.${index}.nrcNumber`)}
-                          type="text"
-                          placeholder="12/OUKAMA(N)123456"
-                          className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none bg-white text-gray-800 placeholder-gray-500"
-                        />
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">State</label>
+                            <select
+                              {...((): React.SelectHTMLAttributes<HTMLSelectElement> => {
+                                const r = register(`passengers.${index}.nrcState`)
+                                return {
+                                  ...r,
+                                  onChange: (e) => {
+                                    r.onChange(e)
+                                    setValue(`passengers.${index}.nrcTownship`, '')
+                                    setValue(`passengers.${index}.nrcType`, '')
+                                    setValue(`passengers.${index}.nrcNumberPart`, '')
+                                  },
+                                }
+                              })()}
+                              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none bg-white text-gray-800"
+                            >
+                              <option value="">Select state</option>
+                              {(NRC_DATA.nric?.state || []).map((s: { value: number; value_mm?: string }) => (
+                                <option key={s.value} value={String(s.value)}>
+                                  {s.value}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">Township</label>
+                            <select
+                              {...((): React.SelectHTMLAttributes<HTMLSelectElement> => {
+                                const r = register(`passengers.${index}.nrcTownship`)
+                                return {
+                                  ...r,
+                                  onChange: (e) => {
+                                    r.onChange(e)
+                                    setValue(`passengers.${index}.nrcType`, '')
+                                    setValue(`passengers.${index}.nrcNumberPart`, '')
+                                  },
+                                }
+                              })()}
+                              disabled={!watch(`passengers.${index}.nrcState`)}
+                              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none bg-white text-gray-800 disabled:bg-gray-100 disabled:text-gray-500"
+                            >
+                              <option value="">Select township</option>
+                              {(() => {
+                                const state = watch(`passengers.${index}.nrcState`)
+                                const list = state && (NRC_DATA.nric?.township as Record<string, Array<{ value: string; value_concat?: string }>>)?.[state]
+                                return (list || []).map((t) => (
+                                  <option key={t.value} value={t.value}>
+                                    {t.value_concat || t.value}
+                                  </option>
+                                ))
+                              })()}
+                            </select>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">Type</label>
+                            <select
+                              {...register(`passengers.${index}.nrcType`)}
+                              disabled={!watch(`passengers.${index}.nrcTownship`)}
+                              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none bg-white text-gray-800 disabled:bg-gray-100 disabled:text-gray-500"
+                            >
+                              <option value="">Select type</option>
+                              {(NRC_DATA.nric?.type || []).map((t: { value: string; value_mm?: string }) => (
+                                <option key={t.value} value={t.value}>
+                                  {t.value} ({t.value_mm || ''})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">Number</label>
+                            <input
+                              {...register(`passengers.${index}.nrcNumberPart`)}
+                              type="text"
+                              placeholder="e.g. 123456"
+                              disabled={!watch(`passengers.${index}.nrcType`)}
+                              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none bg-white text-gray-800 placeholder-gray-500 disabled:bg-gray-100 disabled:text-gray-500"
+                            />
+                          </div>
+                        </div>
                         {errors.passengers?.[index]?.nrcNumber && (
                           <p className="mt-1 text-sm text-red-600">
                             {errors.passengers[index]?.nrcNumber?.message}

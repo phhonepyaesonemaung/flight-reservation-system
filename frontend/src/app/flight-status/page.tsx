@@ -5,7 +5,8 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import Logo from '@/components/Logo'
-import { Search, Plane, Clock, MapPin, AlertCircle } from 'lucide-react'
+import { Search, Plane } from 'lucide-react'
+import { api } from '@/lib/api'
 
 const statusSchema = z.object({
   flightNumber: z.string().min(1, 'Flight number is required'),
@@ -14,8 +15,34 @@ const statusSchema = z.object({
 
 type StatusFormData = z.infer<typeof statusSchema>
 
+type FlightStatusResult = {
+  flight_number: string
+  status: string
+  departure_airport_code: string
+  departure_airport_name: string
+  arrival_airport_code: string
+  arrival_airport_name: string
+  departure_time: string
+  arrival_time: string
+}
+
+function formatTime(iso: string) {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+}
+
+function displayStatus(status: string) {
+  if (status === 'scheduled') return 'On Time'
+  if (status === 'delayed') return 'Delayed'
+  if (status === 'cancelled') return 'Cancelled'
+  return status
+}
+
 export default function FlightStatusPage() {
-  const [flightStatus, setFlightStatus] = useState<any>(null)
+  const [flightStatus, setFlightStatus] = useState<FlightStatusResult | null>(null)
+  const [notFound, setNotFound] = useState(false)
+  const [loading, setLoading] = useState(false)
 
   const {
     register,
@@ -25,22 +52,25 @@ export default function FlightStatusPage() {
     resolver: zodResolver(statusSchema),
   })
 
-  const onSubmit = (data: StatusFormData) => {
-    // Simulate flight status lookup
-    setFlightStatus({
-      flightNumber: data.flightNumber.toUpperCase(),
-      airline: 'AEROLINK Airways',
-      status: 'On Time',
-      origin: 'New York (JFK)',
-      destination: 'Los Angeles (LAX)',
-      scheduledDeparture: '08:00 AM',
-      estimatedDeparture: '08:00 AM',
-      scheduledArrival: '10:30 AM',
-      estimatedArrival: '10:30 AM',
-      gate: 'A12',
-      terminal: 'Terminal 4',
-      date: data.date,
-    })
+  const onSubmit = async (data: StatusFormData) => {
+    setLoading(true)
+    setNotFound(false)
+    setFlightStatus(null)
+    try {
+      const res = await api.get('/flight/status', {
+        params: { flight_number: data.flightNumber.trim(), date: data.date },
+      })
+      const payload = res.data?.data ?? res.data
+      if (payload && payload.flight_number) {
+        setFlightStatus(payload)
+      } else {
+        setNotFound(true)
+      }
+    } catch {
+      setNotFound(true)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -95,35 +125,48 @@ export default function FlightStatusPage() {
 
             <button
               type="submit"
-              className="w-full bg-accent hover:bg-accent-hover text-white py-4 rounded-lg font-bold text-lg transition flex items-center justify-center"
+              disabled={loading}
+              className="w-full bg-accent hover:bg-accent-hover disabled:opacity-70 text-white py-4 rounded-lg font-bold text-lg transition flex items-center justify-center"
             >
               <Search className="w-5 h-5 mr-2" />
-              Check Status
+              {loading ? 'Checking…' : 'Check Status'}
             </button>
           </form>
         </div>
+
+        {/* Not found */}
+        {notFound && !flightStatus && (
+          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+            <p className="text-gray-600 text-lg">No flight found for this flight number and date.</p>
+            <p className="text-gray-500 text-sm mt-2">Please check the flight number and date and try again.</p>
+          </div>
+        )}
 
         {/* Flight Status Result */}
         {flightStatus && (
           <div className="bg-white rounded-lg shadow-lg overflow-hidden">
             <div className={`p-6 ${
-              flightStatus.status === 'On Time'
+              flightStatus.status === 'scheduled'
                 ? 'bg-green-50 border-l-4 border-green-500'
-                : 'bg-yellow-50 border-l-4 border-yellow-500'
+                : flightStatus.status === 'cancelled'
+                  ? 'bg-red-50 border-l-4 border-red-500'
+                  : 'bg-yellow-50 border-l-4 border-yellow-500'
             }`}>
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-2xl font-bold text-gray-800 mb-1">
-                    {flightStatus.flightNumber}
+                    {flightStatus.flight_number}
                   </h2>
-                  <p className="text-gray-600">{flightStatus.airline}</p>
+                  <p className="text-gray-600">AEROLINK Airways</p>
                 </div>
                 <div className={`px-4 py-2 rounded-full font-bold ${
-                  flightStatus.status === 'On Time'
+                  flightStatus.status === 'scheduled'
                     ? 'bg-green-500 text-white'
-                    : 'bg-yellow-500 text-white'
+                    : flightStatus.status === 'cancelled'
+                      ? 'bg-red-500 text-white'
+                      : 'bg-yellow-500 text-white'
                 }`}>
-                  {flightStatus.status}
+                  {displayStatus(flightStatus.status)}
                 </div>
               </div>
             </div>
@@ -133,8 +176,8 @@ export default function FlightStatusPage() {
               <div className="flex items-center justify-between mb-8">
                 <div className="text-center">
                   <p className="text-sm text-gray-500 mb-2">Departure</p>
-                  <p className="text-2xl font-bold text-gray-800 mb-1">{flightStatus.scheduledDeparture}</p>
-                  <p className="text-gray-600">{flightStatus.origin}</p>
+                  <p className="text-2xl font-bold text-gray-800 mb-1">{formatTime(flightStatus.departure_time)}</p>
+                  <p className="text-gray-600">{flightStatus.departure_airport_name} ({flightStatus.departure_airport_code})</p>
                 </div>
                 <div className="flex-1 px-8">
                   <div className="flex items-center justify-center">
@@ -145,8 +188,8 @@ export default function FlightStatusPage() {
                 </div>
                 <div className="text-center">
                   <p className="text-sm text-gray-500 mb-2">Arrival</p>
-                  <p className="text-2xl font-bold text-gray-800 mb-1">{flightStatus.scheduledArrival}</p>
-                  <p className="text-gray-600">{flightStatus.destination}</p>
+                  <p className="text-2xl font-bold text-gray-800 mb-1">{formatTime(flightStatus.arrival_time)}</p>
+                  <p className="text-gray-600">{flightStatus.arrival_airport_name} ({flightStatus.arrival_airport_code})</p>
                 </div>
               </div>
 
@@ -154,19 +197,19 @@ export default function FlightStatusPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                 <div>
                   <p className="text-sm text-gray-500 mb-1">Terminal</p>
-                  <p className="font-semibold text-gray-800">{flightStatus.terminal}</p>
+                  <p className="font-semibold text-gray-800">—</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500 mb-1">Gate</p>
-                  <p className="font-semibold text-gray-800">{flightStatus.gate}</p>
+                  <p className="font-semibold text-gray-800">—</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500 mb-1">Estimated Departure</p>
-                  <p className="font-semibold text-gray-800">{flightStatus.estimatedDeparture}</p>
+                  <p className="text-sm text-gray-500 mb-1">Scheduled Departure</p>
+                  <p className="font-semibold text-gray-800">{formatTime(flightStatus.departure_time)}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500 mb-1">Estimated Arrival</p>
-                  <p className="font-semibold text-gray-800">{flightStatus.estimatedArrival}</p>
+                  <p className="text-sm text-gray-500 mb-1">Scheduled Arrival</p>
+                  <p className="font-semibold text-gray-800">{formatTime(flightStatus.arrival_time)}</p>
                 </div>
               </div>
             </div>

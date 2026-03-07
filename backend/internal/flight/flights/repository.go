@@ -45,6 +45,24 @@ func (r *Repository) CreateFlight(flightNumber string, departureAirportID, arriv
 	return &flight, nil
 }
 
+// UpdateFlight updates an existing flight by ID. Only the flights table is updated.
+func (r *Repository) UpdateFlight(id, departureAirportID, arrivalAirportID, aircraftID int, flightNumber string, departureTime, arrivalTime time.Time, basePrice float64, status string) (*Flight, error) {
+	now := time.Now()
+	var flight Flight
+	err := r.db.QueryRow(
+		`UPDATE flights SET
+		 flight_number = $1, departure_airport_id = $2, arrival_airport_id = $3,
+		 departure_time = $4, arrival_time = $5, aircraft_id = $6, base_price = $7, status = $8, updated_at = $9
+		 WHERE id = $10
+		 RETURNING id, flight_number, departure_airport_id, arrival_airport_id, departure_time, arrival_time, aircraft_id, base_price, status, created_at, updated_at`,
+		flightNumber, departureAirportID, arrivalAirportID, departureTime, arrivalTime, aircraftID, basePrice, status, now, id,
+	).Scan(&flight.ID, &flight.FlightNumber, &flight.DepartureAirportID, &flight.ArrivalAirportID, &flight.DepartureTime, &flight.ArrivalTime, &flight.AircraftID, &flight.BasePrice, &flight.Status, &flight.CreatedAt, &flight.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &flight, nil
+}
+
 // insertFlightCabinInventoryTx inserts flight_cabin_inventory rows from the aircraft's seats (grouped by class). All seats start available.
 func (r *Repository) insertFlightCabinInventoryTx(tx *sql.Tx, flightID, aircraftID int) error {
 	rows, err := tx.Query(
@@ -218,4 +236,44 @@ func (r *Repository) SearchFlights(fromAirportID, toAirportID int, date string, 
 		list = append(list, row)
 	}
 	return list, rows.Err()
+}
+
+// FlightStatusRow is the result of a flight status lookup (by flight number and date).
+type FlightStatusRow struct {
+	FlightNumber            string    `json:"flight_number"`
+	Status                  string    `json:"status"`
+	DepartureAirportCode    string    `json:"departure_airport_code"`
+	DepartureAirportName    string    `json:"departure_airport_name"`
+	ArrivalAirportCode      string    `json:"arrival_airport_code"`
+	ArrivalAirportName      string    `json:"arrival_airport_name"`
+	DepartureTime           time.Time `json:"departure_time"`
+	ArrivalTime             time.Time `json:"arrival_time"`
+}
+
+// GetFlightStatus finds a flight by flight number and date. Returns nil if not found.
+// Flight number is matched case-insensitively and ignoring spaces (e.g. "AL 101" matches "al101").
+func (r *Repository) GetFlightStatus(flightNumber, date string) (*FlightStatusRow, error) {
+	var row FlightStatusRow
+	err := r.db.QueryRow(`
+		SELECT f.flight_number, f.status,
+		       dep.code AS departure_airport_code, dep.name AS departure_airport_name,
+		       arr.code AS arrival_airport_code, arr.name AS arrival_airport_name,
+		       f.departure_time, f.arrival_time
+		FROM flights f
+		JOIN airports dep ON dep.id = f.departure_airport_id
+		JOIN airports arr ON arr.id = f.arrival_airport_id
+		WHERE LOWER(REPLACE(TRIM(f.flight_number), ' ', '')) = LOWER(REPLACE(TRIM($1), ' ', ''))
+		  AND DATE(f.departure_time) = $2
+		ORDER BY f.departure_time
+		LIMIT 1`,
+		flightNumber, date,
+	).Scan(&row.FlightNumber, &row.Status, &row.DepartureAirportCode, &row.DepartureAirportName,
+		&row.ArrivalAirportCode, &row.ArrivalAirportName, &row.DepartureTime, &row.ArrivalTime)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
 }

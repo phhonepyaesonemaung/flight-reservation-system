@@ -1,9 +1,11 @@
 package main
 
 import (
+	"aerolink_backend/internal/admin"
 	"aerolink_backend/internal/auth"
 	"aerolink_backend/internal/booking"
 	"aerolink_backend/internal/flight/aircrafts"
+	"aerolink_backend/internal/program"
 	"aerolink_backend/internal/flight/airports"
 	"aerolink_backend/internal/flight/flights"
 	"aerolink_backend/internal/flight/seats"
@@ -15,6 +17,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -31,6 +34,11 @@ func main() {
 	}
 	defer database.CloseDB()
 
+	// Keep SERIAL sequences in sync with existing rows (avoids "duplicate key" on create after seed/import)
+	if err := database.ResetSequences(); err != nil {
+		log.Printf("Warning: reset sequences failed (create may fail if data was imported with explicit IDs): %v", err)
+	}
+
 	// Auth routes
 	authHandler := auth.NewHandler(database.DB)
 	userHandler := user.NewHandler(database.DB)
@@ -38,31 +46,50 @@ func main() {
 	aircraftHandler := aircrafts.NewHandler(database.DB)
 	flightHandler := flights.NewHandler(database.DB)
 	seatHandler := seats.NewHandler(database.DB)
-	bookingHandler := booking.NewHandler(database.DB)
+	programHandler := program.NewHandler(database.DB)
+	bookingHandler := booking.NewHandler(database.DB, program.NewService(program.NewRepository(database.DB)))
+	adminHandler := admin.NewHandler(database.DB)
 
 	http.HandleFunc("/api/auth/signup", authHandler.Signup)
 	http.HandleFunc("/api/auth/signin", authHandler.Signin)
 	http.HandleFunc("/api/auth/refresh", authHandler.RefreshToken)
 	http.HandleFunc("/api/auth/verify-email", authHandler.VerifyEmail)
+	http.HandleFunc("/api/auth/admin/signin", authHandler.AdminSignin)
+	http.HandleFunc("/api/auth/admin/seed", authHandler.AdminSeed)
 
 	// User routes (protected)
 	http.HandleFunc("/api/user/get", middleware.AuthMiddleware(userHandler.GetUser))
 
-	// Flight routes (protected)
-	http.HandleFunc("/api/flight/create-airport", airportHandler.CreateAirport)
+	// Flight routes (public read; admin-only create/update)
+	http.HandleFunc("/api/flight/create-airport", middleware.AdminMiddleware(database.DB, airportHandler.CreateAirport))
 	http.HandleFunc("/api/flight/get-all-airports", airportHandler.GetAllAirports)
-	http.HandleFunc("/api/flight/create-aircraft", aircraftHandler.CreateAircraft)
+	http.HandleFunc("/api/flight/create-aircraft", middleware.AdminMiddleware(database.DB, aircraftHandler.CreateAircraft))
 	http.HandleFunc("/api/flight/get-all-aircrafts", aircraftHandler.GetAllAircrafts)
-	http.HandleFunc("/api/flight/create-flight", flightHandler.CreateFlight)
+	http.HandleFunc("/api/flight/create-flight", middleware.AdminMiddleware(database.DB, flightHandler.CreateFlight))
+	http.HandleFunc("/api/flight/update-flight", middleware.AdminMiddleware(database.DB, flightHandler.UpdateFlight))
 	http.HandleFunc("/api/flight/get-all-flights", flightHandler.GetAllFlights)
-	http.HandleFunc("/api/flight/backfill-flight-cabin-inventory", flightHandler.BackfillFlightCabinInventory)
+	http.HandleFunc("/api/flight/backfill-flight-cabin-inventory", middleware.AdminMiddleware(database.DB, flightHandler.BackfillFlightCabinInventory))
 	http.HandleFunc("/api/flight/search", flightHandler.SearchFlights)
-	http.HandleFunc("/api/flight/create-seat", seatHandler.CreateSeat)
+	http.HandleFunc("/api/flight/status", flightHandler.GetFlightStatus)
+	http.HandleFunc("/api/flight/create-seat", middleware.AdminMiddleware(database.DB, seatHandler.CreateSeat))
 	http.HandleFunc("/api/flight/get-all-seats", seatHandler.GetAllSeats)
-	http.HandleFunc("/api/flight/create-flight-seats", seatHandler.CreateFlightSeats)
+	http.HandleFunc("/api/flight/create-flight-seats", middleware.AdminMiddleware(database.DB, seatHandler.CreateFlightSeats))
+
+	// Admin-only (require admin JWT from admin signin)
+	http.HandleFunc("/api/admin/stats", middleware.AdminMiddleware(database.DB, adminHandler.GetStats))
+	http.HandleFunc("/api/admin/bookings", middleware.AdminMiddleware(database.DB, bookingHandler.ListAllBookings))
+	http.HandleFunc("/api/admin/users", middleware.AdminMiddleware(database.DB, userHandler.ListAllUsers))
+
+	// Program (tiers public; purchase and my-membership protected)
+	http.HandleFunc("/api/program/tiers", programHandler.ListTiers)
+	http.HandleFunc("/api/program/my-membership", middleware.AuthMiddleware(programHandler.GetMyMembership))
+	http.HandleFunc("/api/program/purchase", middleware.AuthMiddleware(programHandler.Purchase))
 
 	// Booking (protected)
 	http.HandleFunc("/api/booking/create", middleware.AuthMiddleware(bookingHandler.CreateBooking))
+	http.HandleFunc("/api/booking/my-bookings", middleware.AuthMiddleware(bookingHandler.GetUserBookings))
+	http.HandleFunc("/api/booking/receipt", middleware.AuthMiddleware(bookingHandler.GetBookingReceipt))
+	http.HandleFunc("/api/booking/check-in", middleware.AuthMiddleware(bookingHandler.CheckIn))
 
 	// Health check endpoint
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -83,10 +110,10 @@ func main() {
 		response.Success(w, http.StatusOK, "Sequences reset successfully; new creates will get the next ids.", nil)
 	})
 
-	// Start server with CORS middleware
+	// Start server with CORS middleware (allow 3000 and 3001 for user and admin sites)
 	port := getEnv("PORT", "8080")
-	allowedOrigin := getEnv("CORS_ORIGIN", "http://localhost:3000")
-	corsHandler := corsMiddleware(allowedOrigin, http.DefaultServeMux)
+	corsOrigins := getEnv("CORS_ORIGINS", "http://localhost:3000,http://localhost:3001")
+	corsHandler := corsMiddleware(corsOrigins, http.DefaultServeMux)
 	log.Printf("Server starting on port %s", port)
 
 	if err := http.ListenAndServe(":"+port, corsHandler); err != nil {
@@ -95,9 +122,24 @@ func main() {
 }
 
 // corsMiddleware wraps a handler to add CORS headers and handle OPTIONS preflight.
-func corsMiddleware(allowOrigin string, next http.Handler) http.Handler {
+// allowOrigins is a comma-separated list (e.g. "http://localhost:3000,http://localhost:3001").
+func corsMiddleware(allowOrigins string, next http.Handler) http.Handler {
+	origins := strings.Split(allowOrigins, ",")
+	for i := range origins {
+		origins[i] = strings.TrimSpace(origins[i])
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", allowOrigin)
+		origin := r.Header.Get("Origin")
+		if origin != "" {
+			for _, o := range origins {
+				if strings.TrimSpace(o) == origin {
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+					break
+				}
+			}
+		} else if len(origins) > 0 && strings.TrimSpace(origins[0]) != "" {
+			w.Header().Set("Access-Control-Allow-Origin", strings.TrimSpace(origins[0]))
+		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		if r.Method == http.MethodOptions {

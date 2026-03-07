@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
@@ -12,6 +12,13 @@ import toast from 'react-hot-toast'
 import { api } from '@/lib/api'
 
 const BOOKING_PASSENGER_KEY = 'booking_passenger'
+
+type Membership = {
+  tier_name: string
+  display_name: string
+  discount_percent: number
+  expires_at: string
+}
 
 const paymentSchema = z.object({
   cardNumber: z.string().min(16, 'Invalid card number'),
@@ -28,6 +35,14 @@ export default function PaymentPage() {
   const searchParams = useSearchParams()
   const flightId = params.id
   const [isProcessing, setIsProcessing] = useState(false)
+  const [membership, setMembership] = useState<Membership | null>(null)
+
+  useEffect(() => {
+    api.get('/program/my-membership').then((res: any) => {
+      const data = res?.data?.data ?? res?.data
+      if (data && data.tier_name) setMembership(data)
+    }).catch(() => {})
+  }, [])
 
   const passengersCount = Math.max(1, parseInt(searchParams.get('passengers') || '1', 10))
   const returnId = searchParams.get('returnId')
@@ -55,7 +70,11 @@ export default function PaymentPage() {
   const flightPricePerPassenger = outboundPrice + returnPrice
   const taxes = 35
   const subtotalPerPassenger = flightPricePerPassenger + taxes
-  const total = subtotalPerPassenger * passengersCount
+  const totalBeforeDiscount = subtotalPerPassenger * passengersCount
+  const discountAmount = membership
+    ? totalBeforeDiscount * (membership.discount_percent / 100)
+    : 0
+  const total = Math.max(0, totalBeforeDiscount - discountAmount)
 
   const onSubmit = async (data: PaymentFormData) => {
     setIsProcessing(true)
@@ -76,10 +95,11 @@ export default function PaymentPage() {
         date_of_birth: item.dateOfBirth,
         passport_number: item.passportNumber || undefined,
       }))
+      // Send pre-discount total; backend applies program discount
       const res = await api.post('/booking/create', {
         flight_id: parseInt(String(flightId), 10),
         cabin_class: searchParams.get('cabinClass') || 'economy',
-        total_amount: total,
+        total_amount: totalBeforeDiscount,
         passengers: passengersPayload,
       })
       const payload = res.data?.data ?? res.data
@@ -222,7 +242,7 @@ export default function PaymentPage() {
                 disabled={isProcessing}
                 className="w-full bg-accent hover:bg-accent-hover disabled:bg-gray-400 text-white py-4 rounded-lg font-bold text-lg transition shadow-lg hover:shadow-xl"
               >
-                {isProcessing ? 'Processing Payment...' : `Pay $${total}`}
+                {isProcessing ? 'Processing Payment...' : `Pay $${total.toFixed(2)}`}
               </button>
             </form>
           </div>
@@ -265,12 +285,18 @@ export default function PaymentPage() {
                 <span>Subtotal</span>
                 <span className="font-semibold">${subtotalPerPassenger} x {passengersCount}</span>
               </div>
+              {membership && discountAmount > 0 && (
+                <div className="flex justify-between text-green-700">
+                  <span>Program discount ({membership.display_name} {membership.discount_percent}%)</span>
+                  <span className="font-semibold">-${discountAmount.toFixed(2)}</span>
+                </div>
+              )}
             </div>
 
             <div className="border-t border-gray-200 pt-4 mb-6">
               <div className="flex justify-between items-center">
                 <span className="text-lg font-bold text-gray-800">Total</span>
-                <span className="text-2xl font-bold text-accent">${total}</span>
+                <span className="text-2xl font-bold text-accent">${total.toFixed(2)}</span>
               </div>
             </div>
 

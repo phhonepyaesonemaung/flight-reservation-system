@@ -1,10 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSelector } from 'react-redux'
 import { RootState } from '@/store'
+import { useRehydrated } from '@/contexts/RehydrationContext'
 import Logo from './Logo'
 import Link from 'next/link'
-import { LayoutDashboard, Plane, Users, CreditCard, BarChart3, Settings, Building2, MapPin } from 'lucide-react'
+import { LayoutDashboard, Plane, Users, CreditCard, BarChart3, MapPin } from 'lucide-react'
 
 interface AdminLayoutProps {
   children: React.ReactNode
@@ -12,14 +13,29 @@ interface AdminLayoutProps {
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const router = useRouter()
+  const rehydrated = useRehydrated()
   const { isAuthenticated, user } = useSelector((state: RootState) => state.auth)
+  const [authCheckReady, setAuthCheckReady] = useState(false)
+
+  const adminSignInPath = process.env.NEXT_PUBLIC_SITE === 'admin' ? '/auth/admin/signin' : '/auth/signin'
 
   useEffect(() => {
-    if (!isAuthenticated || user?.role !== 'admin') {
-      router.push('/auth/signin')
+    if (!rehydrated) {
+      setAuthCheckReady(false)
+      return
     }
-  }, [isAuthenticated, user, router])
+    const id = setTimeout(() => setAuthCheckReady(true), 100)
+    return () => clearTimeout(id)
+  }, [rehydrated])
 
+  useEffect(() => {
+    if (!authCheckReady) return
+    if (!isAuthenticated || user?.role !== 'admin') {
+      router.push(adminSignInPath)
+    }
+  }, [authCheckReady, isAuthenticated, user, router, adminSignInPath])
+
+  if (!rehydrated || !authCheckReady) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-10 w-10 border-2 border-primary-600 border-t-transparent" /></div>
   if (!isAuthenticated || user?.role !== 'admin') return null
 
   return (
@@ -72,13 +88,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               <span>Users</span>
             </Link>
             <Link
-              href="/admin/airlines"
-              className="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-gray-100 text-gray-700"
-            >
-              <Building2 className="w-5 h-5" />
-              <span>Airlines</span>
-            </Link>
-            <Link
               href="/admin/airports"
               className="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-gray-100 text-gray-700"
             >
@@ -91,13 +100,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             >
               <BarChart3 className="w-5 h-5" />
               <span>Analytics</span>
-            </Link>
-            <Link
-              href="/admin/settings"
-              className="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-gray-100 text-gray-700"
-            >
-              <Settings className="w-5 h-5" />
-              <span>Settings</span>
             </Link>
           </nav>
         </aside>

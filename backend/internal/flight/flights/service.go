@@ -24,6 +24,19 @@ type CreateFlightRequest struct {
 	Status             string    `json:"status"`
 }
 
+// UpdateFlightRequest is the body for the update flight endpoint.
+type UpdateFlightRequest struct {
+	ID                 int       `json:"id"`
+	FlightNumber       string    `json:"flight_number"`
+	DepartureAirportID int       `json:"departure_airport_id"`
+	ArrivalAirportID   int       `json:"arrival_airport_id"`
+	DepartureTime      time.Time `json:"departure_time"`
+	ArrivalTime        time.Time `json:"arrival_time"`
+	AircraftID         int       `json:"aircraft_id"`
+	BasePrice          float64   `json:"base_price"`
+	Status             string    `json:"status"`
+}
+
 func (s *Service) CreateFlight(req *CreateFlightRequest) (*Flight, error) {
 	// Set default status if not provided
 	status := req.Status
@@ -53,6 +66,30 @@ func (s *Service) CreateFlight(req *CreateFlightRequest) (*Flight, error) {
 	return flight, nil
 }
 
+func (s *Service) UpdateFlight(req *UpdateFlightRequest) (*Flight, error) {
+	if req.ID <= 0 {
+		return nil, errors.New("flight id is required")
+	}
+	status := req.Status
+	if status == "" {
+		status = "scheduled"
+	}
+	if status != "scheduled" && status != "delayed" && status != "cancelled" {
+		return nil, errors.New("invalid status: must be 'scheduled', 'delayed', or 'cancelled'")
+	}
+	return s.repo.UpdateFlight(
+		req.ID,
+		req.DepartureAirportID,
+		req.ArrivalAirportID,
+		req.AircraftID,
+		req.FlightNumber,
+		req.DepartureTime,
+		req.ArrivalTime,
+		req.BasePrice,
+		status,
+	)
+}
+
 func (s *Service) GetAllFlights(departureAirportID *int) ([]Flight, error) {
 	flights, err := s.repo.GetAllFlights(departureAirportID)
 	if err != nil {
@@ -64,6 +101,14 @@ func (s *Service) GetAllFlights(departureAirportID *int) ([]Flight, error) {
 // BackfillFlightCabinInventory creates or updates flight_cabin_inventory for all existing flights from their aircraft seats.
 func (s *Service) BackfillFlightCabinInventory() (flightsProcessed int, err error) {
 	return s.repo.BackfillFlightCabinInventory()
+}
+
+// GetFlightStatus returns flight status by flight number and date, or nil if not found.
+func (s *Service) GetFlightStatus(flightNumber, date string) (*FlightStatusRow, error) {
+	if flightNumber == "" || date == "" {
+		return nil, nil
+	}
+	return s.repo.GetFlightStatus(flightNumber, date)
 }
 
 // SearchFlightsRequest is the body for the flight search endpoint.

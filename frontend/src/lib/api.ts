@@ -1,4 +1,6 @@
 import axios from 'axios'
+import { store, persistor } from '@/store'
+import { logout } from '@/store/slices/authSlice'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
 
@@ -31,8 +33,12 @@ api.interceptors.response.use(
       if (typeof window !== 'undefined') {
         localStorage.removeItem('token')
         sessionStorage.removeItem('token')
+        store.dispatch(logout())
+        const signInPath = process.env.NEXT_PUBLIC_SITE === 'admin' ? '/auth/admin/signin' : '/auth/signin'
+        persistor.purge().then(() => {
+          window.location.href = signInPath
+        })
       }
-      window.location.href = '/auth/signin'
     }
     return Promise.reject(error)
   }

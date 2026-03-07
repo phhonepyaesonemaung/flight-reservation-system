@@ -143,3 +143,49 @@ func (h *Handler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 	}
 	response.Success(w, http.StatusOK, "Email verified successfully", resp)
 }
+
+func (h *Handler) AdminSignin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		response.Error(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	var req AdminSigninRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+	resp, err := h.service.AdminSignin(&req)
+	if err != nil {
+		statusCode := http.StatusUnauthorized
+		if strings.Contains(err.Error(), "required") {
+			statusCode = http.StatusBadRequest
+		}
+		log.Printf("AdminSignin error: %v", err)
+		response.Error(w, statusCode, err.Error())
+		return
+	}
+	response.Success(w, http.StatusOK, "success", resp)
+}
+
+func (h *Handler) AdminSeed(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		response.Error(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	var req AdminSeedRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+	resp, err := h.service.AdminSeed(&req)
+	if err != nil {
+		statusCode := http.StatusBadRequest
+		if strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "already taken") {
+			statusCode = http.StatusConflict
+		}
+		log.Printf("AdminSeed error: %v", err)
+		response.Error(w, statusCode, err.Error())
+		return
+	}
+	response.Success(w, http.StatusCreated, "Admin created", resp)
+}

@@ -141,13 +141,10 @@ export default function Home() {
             
             {/* Navigation */}
             <nav className="hidden md:flex items-center space-x-8">
-              <Link href="/" className="text-white hover:text-blue-200 transition font-medium">
-                BOOK
+              <Link href="/program" className="text-white hover:text-blue-200 transition font-medium">
+                PROGRAM
               </Link>
-              <Link href="/check-in" className="text-white hover:text-blue-200 transition font-medium">
-                CHECK-IN
-              </Link>
-              <Link href="/my-trips" className="text-white hover:text-blue-200 transition font-medium">
+              <Link href="/my-bookings" className="text-white hover:text-blue-200 transition font-medium">
                 MY TRIPS
               </Link>
               <Link href="/flight-status" className="text-white hover:text-blue-200 transition font-medium">

@@ -125,3 +125,50 @@ func (h *Handler) SearchFlights(w http.ResponseWriter, r *http.Request) {
 
 	response.Success(w, http.StatusOK, "success", resp)
 }
+
+func (h *Handler) GetFlightStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		response.Error(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	flightNumber := strings.TrimSpace(r.URL.Query().Get("flight_number"))
+	date := strings.TrimSpace(r.URL.Query().Get("date"))
+	if flightNumber == "" || date == "" {
+		response.Error(w, http.StatusBadRequest, "flight_number and date are required")
+		return
+	}
+	row, err := h.service.GetFlightStatus(flightNumber, date)
+	if err != nil {
+		log.Printf("Get flight status error: %v", err)
+		response.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if row == nil {
+		response.Success(w, http.StatusOK, "Flight not found", nil)
+		return
+	}
+	response.Success(w, http.StatusOK, "success", row)
+}
+
+func (h *Handler) UpdateFlight(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut && r.Method != http.MethodPost {
+		response.Error(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	var req UpdateFlightRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+	resp, err := h.service.UpdateFlight(&req)
+	if err != nil {
+		statusCode := http.StatusInternalServerError
+		if strings.Contains(err.Error(), "required") || strings.Contains(err.Error(), "invalid") {
+			statusCode = http.StatusBadRequest
+		}
+		log.Printf("Update flight error: %v", err)
+		response.Error(w, statusCode, err.Error())
+		return
+	}
+	response.Success(w, http.StatusOK, "Flight updated successfully", resp)
+}

@@ -1,11 +1,17 @@
 package booking
 
 import (
+	"database/sql"
 	"errors"
 	"strings"
 	"time"
 
 	"aerolink_backend/package/mail"
+)
+
+const (
+	checkInWindowStart = 24 * time.Hour // check-in opens 24h before departure
+	checkInWindowEnd   = 45 * time.Minute // check-in closes 45min before departure
 )
 
 type Service struct {
@@ -51,6 +57,9 @@ func (s *Service) CreateBooking(userID int, req *CreateBookingRequest) (*CreateB
 
 	bookingID, bookingRef, err := s.repo.CreateBooking(userID, req.FlightID, cabin, req.TotalAmount, req.Passengers)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errors.New("not enough seats available for this flight and cabin class")
+		}
 		return nil, err
 	}
 
@@ -126,4 +135,45 @@ func formatCabinClass(cabin string) string {
 		return ""
 	}
 	return strings.ToUpper(trimmed[:1]) + strings.ToLower(trimmed[1:])
+}
+
+func (s *Service) GetUserBookings(userID int) ([]UserBookingItem, error) {
+	return s.repo.GetUserBookings(userID)
+}
+
+func (s *Service) GetBookingReceipt(bookingID, userID int) (*Receipt, error) {
+	return s.repo.GetBookingReceipt(bookingID, userID)
+}
+
+func (s *Service) GetAllBookingsForAdmin() ([]AdminBookingRow, error) {
+	return s.repo.GetAllBookingsForAdmin()
+}
+
+func (s *Service) CheckIn(bookingID, userID int) error {
+	dep, found, err := s.repo.GetBookingDepartureTime(bookingID, userID)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return errors.New("booking not found")
+	}
+	now := time.Now()
+	if now.After(dep) {
+		return errors.New("flight has already departed; check-in is closed")
+	}
+	untilDeparture := dep.Sub(now)
+	if untilDeparture > checkInWindowStart {
+		return errors.New("check-in opens 24 hours before departure")
+	}
+	if untilDeparture < checkInWindowEnd {
+		return errors.New("check-in has closed (45 minutes before departure)")
+	}
+	updated, err := s.repo.CheckIn(bookingID, userID)
+	if err != nil {
+		return err
+	}
+	if !updated {
+		return errors.New("booking not found or already checked in")
+	}
+	return nil
 }

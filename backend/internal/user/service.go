@@ -20,3 +20,7 @@ func (s *Service) GetUser(userID int) (*auth.User, error) {
 	}
 	return user, nil
 }
+
+func (s *Service) GetAllUsersWithBookingCount() ([]UserWithBookingCount, error) {
+	return s.repo.GetAllUsersWithBookingCount()
+}

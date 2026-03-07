@@ -145,10 +145,12 @@ func (s *Service) Signin(req *SigninRequest) (*AuthResponse, error) {
 		return nil, errors.New("failed to generate refresh token")
 	}
 
+	userResp := user.ToResponse()
+	userResp.Role = "user"
 	response := &AuthResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
-		User:         user.ToResponse(),
+		User:         userResp,
 	}
 
 	return response, nil
@@ -179,10 +181,12 @@ func (s *Service) RefreshToken(req *RefreshTokenRequest) (*AuthResponse, error) 
 		return nil, errors.New("failed to generate refresh token")
 	}
 
+	userResp := user.ToResponse()
+	userResp.Role = "user"
 	response := &AuthResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
-		User:         user.ToResponse(),
+		User:         userResp,
 	}
 
 	return response, nil
@@ -214,10 +218,110 @@ func (s *Service) VerifyEmail(token string) (*AuthResponse, error) {
 		return nil, errors.New("failed to generate refresh token")
 	}
 	_ = s.repo.DeleteVerificationToken(token)
+	userResp := user.ToResponse()
+	userResp.Role = "user"
 	return &AuthResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
-		User:         user.ToResponse(),
+		User:         userResp,
+	}, nil
+}
+
+// AdminSigninRequest is the body for admin signin
+type AdminSigninRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// AdminSignin validates credentials against admin_users and returns tokens + user with role "admin"
+func (s *Service) AdminSignin(req *AdminSigninRequest) (*AuthResponse, error) {
+	if strings.TrimSpace(req.Username) == "" || strings.TrimSpace(req.Password) == "" {
+		return nil, errors.New("username and password are required")
+	}
+	admin, err := s.repo.FindAdminByUsername(strings.TrimSpace(req.Username))
+	if err != nil {
+		return nil, errors.New("invalid username or password")
+	}
+	if !password.ComparePassword(admin.PasswordHash, req.Password) {
+		return nil, errors.New("invalid username or password")
+	}
+	accessToken, err := jwt.GenerateAccessToken(admin.ID)
+	if err != nil {
+		return nil, errors.New("failed to generate access token")
+	}
+	refreshToken, err := jwt.GenerateRefreshToken(admin.ID)
+	if err != nil {
+		return nil, errors.New("failed to generate refresh token")
+	}
+	userResp := &UserResponse{
+		ID:        admin.ID,
+		Username:  admin.Username,
+		Role:      "admin",
+		CreatedAt: admin.CreatedAt,
+		UpdatedAt: admin.UpdatedAt,
+	}
+	return &AuthResponse{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		User:         userResp,
+	}, nil
+}
+
+// AdminSeedRequest is the body for seeding the first admin (only when no admins exist)
+type AdminSeedRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// AdminSeed creates the first admin user. Returns error if any admin already exists.
+func (s *Service) AdminSeed(req *AdminSeedRequest) (*AuthResponse, error) {
+	if strings.TrimSpace(req.Username) == "" || strings.TrimSpace(req.Password) == "" {
+		return nil, errors.New("username and password are required")
+	}
+	if len(req.Username) < 3 {
+		return nil, errors.New("username must be at least 3 characters")
+	}
+	if len(req.Password) < 6 {
+		return nil, errors.New("password must be at least 6 characters")
+	}
+	n, err := s.repo.CountAdmins()
+	if err != nil {
+		return nil, errors.New("failed to check admins")
+	}
+	if n > 0 {
+		return nil, errors.New("admin already exists; use admin signin")
+	}
+	exists, err := s.repo.AdminUsernameExists(strings.TrimSpace(req.Username))
+	if err != nil || exists {
+		return nil, errors.New("username already taken")
+	}
+	hashed, err := password.HashPassword(req.Password)
+	if err != nil {
+		return nil, errors.New("failed to hash password")
+	}
+	admin, err := s.repo.CreateAdmin(strings.TrimSpace(req.Username), hashed)
+	if err != nil {
+		return nil, errors.New("failed to create admin")
+	}
+	accessToken, err := jwt.GenerateAccessToken(admin.ID)
+	if err != nil {
+		return nil, errors.New("failed to generate access token")
+	}
+	refreshToken, err := jwt.GenerateRefreshToken(admin.ID)
+	if err != nil {
+		return nil, errors.New("failed to generate refresh token")
+	}
+	userResp := &UserResponse{
+		ID:        admin.ID,
+		Username:  admin.Username,
+		Role:      "admin",
+		CreatedAt: admin.CreatedAt,
+		UpdatedAt: admin.UpdatedAt,
+	}
+	return &AuthResponse{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		User:         userResp,
 	}, nil
 }
 
