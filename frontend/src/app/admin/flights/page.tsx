@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import AdminLayout from '@/components/AdminLayout'
 import { Plus, Edit, Trash2, Search, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { api } from '@/lib/api'
@@ -224,8 +223,7 @@ export default function AdminFlightsPage() {
   }
 
   return (
-    <AdminLayout>
-      <>
+    <>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Manage Flights</h1>
         <button
@@ -609,7 +607,6 @@ export default function AdminFlightsPage() {
           </div>
         </div>
       )}
-      </>
-    </AdminLayout>
+    </>
   )
 }

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import AdminLayout from '@/components/AdminLayout'
 import Link from 'next/link'
 import { Plane, CreditCard, BarChart3, Users } from 'lucide-react'
 import { api } from '@/lib/api'
@@ -44,7 +43,7 @@ export default function AdminDashboard() {
   }, [])
 
   return (
-    <AdminLayout>
+    <>
       <h1 className="text-3xl font-bold text-gray-800 mb-8">Dashboard</h1>
 
       {loading ? (
@@ -140,6 +139,6 @@ export default function AdminDashboard() {
           </div>
         </>
       )}
-    </AdminLayout>
+    </>
   )
 }

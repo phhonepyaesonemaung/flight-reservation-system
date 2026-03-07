@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import AdminLayout from '@/components/AdminLayout'
 import { Plus, Search, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { api } from '@/lib/api'
@@ -139,7 +138,6 @@ export default function AdminAirportsPage() {
           </div>
         )}
       </div>
-<<<<<<< HEAD
 
       {showAdd && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
@@ -216,9 +214,6 @@ export default function AdminAirportsPage() {
           </div>
         </div>
       )}
-    </AdminLayout>
-=======
     </>
->>>>>>> 01c6c524e6701ce1327aebf3959baf746bb3c4e2
   )
 }

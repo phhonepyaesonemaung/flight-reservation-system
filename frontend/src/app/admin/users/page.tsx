@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import AdminLayout from '@/components/AdminLayout'
 import { Search } from 'lucide-react'
 import { api } from '@/lib/api'
 
@@ -37,7 +36,7 @@ export default function AdminUsersPage() {
   })
 
   return (
-    <AdminLayout>
+    <>
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Users</h1>
       </div>
@@ -93,6 +92,6 @@ export default function AdminUsersPage() {
           </div>
         )}
       </div>
-    </AdminLayout>
+    </>
   )
 }

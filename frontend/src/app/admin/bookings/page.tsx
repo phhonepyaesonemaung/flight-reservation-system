@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import AdminLayout from '@/components/AdminLayout'
 import { Search } from 'lucide-react'
 import { api } from '@/lib/api'
 

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import AdminLayout from '@/components/AdminLayout'
 import { TrendingUp, DollarSign, Users, Plane } from 'lucide-react'
 import { api } from '@/lib/api'
 
@@ -32,7 +31,7 @@ export default function AdminAnalyticsPage() {
     : 0
 
   return (
-    <AdminLayout>
+    <>
       <h1 className="text-3xl font-bold text-gray-800 mb-8">Analytics</h1>
 
       {loading ? (
@@ -89,6 +88,6 @@ export default function AdminAnalyticsPage() {
           </div>
         </>
       )}
-    </AdminLayout>
+    </>
   )
 }
